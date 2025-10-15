@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "exportedAt": "2025-10-15T22:11:38.524Z",
+  "category": "rotating-mutual-aid-ARQ",
+  "page": "funding-readiness-voting-1",
+  "submissions": {
+    "cmctq03o3010il80mru39gh56": {
+      "updatedAt": {
+        "seconds": 1757597727,
+        "nanoseconds": 772000000
+      },
+      "scores": {
+        "did:privy:cmf5xwjij00iqju0dkdpuwnqw": 1,
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 2,
+        "did:privy:cmf7h0cuj00nojx0bavvfgiok": 2,
+        "did:privy:cmf78bdlm000lic0bkjidpszq": 2,
+        "did:privy:cmf9ylgib0049lb0blndaogai": 2
+      }
+    },
+    "cmf50n72m004zkz0bpiof21ol": {
+      "scores": {
+        "did:privy:cmctq03o3010il80mru39gh56": 1,
+        "did:privy:cmf9ylgib0049lb0blndaogai": 3,
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 1,
+        "did:privy:cmf5xwjij00iqju0dkdpuwnqw": 1,
+        "did:privy:cmf78bdlm000lic0bkjidpszq": 2,
+        "did:privy:cmf7h0cuj00nojx0bavvfgiok": 2
+      },
+      "updatedAt": {
+        "seconds": 1757597748,
+        "nanoseconds": 74000000
+      }
+    },
+    "cmf5xwjij00iqju0dkdpuwnqw": {
+      "updatedAt": {
+        "seconds": 1757597696,
+        "nanoseconds": 943000000
+      },
+      "scores": {
+        "did:privy:cmf78bdlm000lic0bkjidpszq": 1,
+        "did:privy:cmctq03o3010il80mru39gh56": 3,
+        "did:privy:cmf7h0cuj00nojx0bavvfgiok": 1,
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 1,
+        "did:privy:cmf9ylgib0049lb0blndaogai": 1
+      }
+    },
+    "cmf78bdlm000lic0bkjidpszq": {
+      "updatedAt": {
+        "seconds": 1757597523,
+        "nanoseconds": 448000000
+      },
+      "scores": {
+        "did:privy:cmf7h0cuj00nojx0bavvfgiok": 2,
+        "did:privy:cmctq03o3010il80mru39gh56": 3,
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 1,
+        "did:privy:cmf9ylgib0049lb0blndaogai": 3,
+        "did:privy:cmf5xwjij00iqju0dkdpuwnqw": 3
+      }
+    },
+    "cmf7aj3en0043l80bqdj2wgvr": {
+      "instant-reward": 20,
+      "scores": {
+        "did:privy:cmf9ylgib0049lb0blndaogai": 2,
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 3,
+        "did:privy:cmf7h0cuj00nojx0bavvfgiok": 3,
+        "did:privy:cmctq03o3010il80mru39gh56": 2,
+        "did:privy:cmf5xwjij00iqju0dkdpuwnqw": 3,
+        "did:privy:cmf78bdlm000lic0bkjidpszq": 2
+      },
+      "updatedAt": {
+        "seconds": 1757597718,
+        "nanoseconds": 199000000
+      }
+    },
+    "cmf7c58q60027lh0bopo1fte4": {
+      "updatedAt": {
+        "seconds": 1757597709,
+        "nanoseconds": 671000000
+      },
+      "scores": {
+        "did:privy:cmctq03o3010il80mru39gh56": 2,
+        "did:privy:cmf78bdlm000lic0bkjidpszq": 1,
+        "did:privy:cmf5xwjij00iqju0dkdpuwnqw": 2,
+        "did:privy:cmf7h0cuj00nojx0bavvfgiok": 2,
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 1,
+        "did:privy:cmf9ylgib0049lb0blndaogai": 1
+      }
+    },
+    "cmf7h0cuj00nojx0bavvfgiok": {
+      "updatedAt": {
+        "seconds": 1757597742,
+        "nanoseconds": 477000000
+      },
+      "scores": {
+        "did:privy:cmf9ylgib0049lb0blndaogai": 3,
+        "did:privy:cmctq03o3010il80mru39gh56": 1,
+        "did:privy:cmf5xwjij00iqju0dkdpuwnqw": 2,
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 1,
+        "did:privy:cmf78bdlm000lic0bkjidpszq": 1
+      }
+    },
+    "cmf7jtecl006djo0b1nqu3s1g": {
+      "updatedAt": {
+        "seconds": 1757595565,
+        "nanoseconds": 414000000
+      },
+      "scores": {
+        "did:privy:cmf78bdlm000lic0bkjidpszq": 1,
+        "did:privy:cmctq03o3010il80mru39gh56": 2,
+        "did:privy:cmf7h0cuj00nojx0bavvfgiok": 1,
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 1,
+        "did:privy:cmf5xwjij00iqju0dkdpuwnqw": 1,
+        "did:privy:cmf9ylgib0049lb0blndaogai": 1
+      }
+    },
+    "cmf9ylgib0049lb0blndaogai": {
+      "updatedAt": {
+        "seconds": 1757546532,
+        "nanoseconds": 101000000
+      },
+      "scores": {
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 2,
+        "did:privy:cmctq03o3010il80mru39gh56": 3,
+        "did:privy:cmf5xwjij00iqju0dkdpuwnqw": 1,
+        "did:privy:cmf78bdlm000lic0bkjidpszq": 1,
+        "did:privy:cmf7h0cuj00nojx0bavvfgiok": 3
+      }
+    },
+    "cmfbcjs3e007zlb0bhdufhvqx": {
+      "scores": {
+        "did:privy:cmf5xwjij00iqju0dkdpuwnqw": 3,
+        "did:privy:cmf78bdlm000lic0bkjidpszq": 1,
+        "did:privy:cmfcnhbs800bqk30b2oskx05z": 1,
+        "did:privy:cmctq03o3010il80mru39gh56": 2,
+        "did:privy:cmf9ylgib0049lb0blndaogai": 2,
+        "did:privy:cmf7h0cuj00nojx0bavvfgiok": 1
+      },
+      "updatedAt": {
+        "seconds": 1757597734,
+        "nanoseconds": 244000000
+      }
+    }
+  }
+}
