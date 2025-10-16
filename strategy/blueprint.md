@@ -13,6 +13,16 @@ Define a reproducible, reviewer‑friendly system for community funding epochs (
   - `attestations/eas-uids.json` (optional)
   - `MANIFEST.json` linking all artifacts and SHA-256 hashes
 
+### Artifact MANIFEST (per-epoch)
+- File: `MANIFEST.json` plus a `MANIFEST.schema.json` to validate structure
+- Schema fields:
+  - `artifacts[]`: `{ type, path, sha256, size, computedAt }`
+  - `code`: `{ repo, commit, tags?: string[], toolVersions?: Record<string,string> }`
+  - `params`: `{ file, hash }` (file path to parameters used; hash of contents)
+- CI integration: re-hash all artifacts and fail on mismatch to ensure tamper‑evidence
+- Distribution: attach MANIFEST to a GitHub Release named `category/page@vX.Y`
+- Optional: PGP-sign the MANIFEST and publish `manifestCid` (IPFS) recorded alongside the plan
+
 ## Networks and Tokens
 
 - Decision: Default network Base; prepare for Optimism, Celo, Arbitrum.
@@ -42,6 +52,20 @@ Define a reproducible, reviewer‑friendly system for community funding epochs (
   - Benefits: human and reviewer window to verify data and params; allows cancel/replace plan before funds move.
 - Mandatory simulation (e.g., Tenderly) — Score: 8/10
   - Preflight sim of batch or Merkle root claims; attach sim URL to `MANIFEST.json`.
+
+### Contract Interfaces and Events (plan integrity)
+- Functions:
+  - `commitPlan(epochId, planHash, manifestCid, earliestExecuteAt)` — stores hash and enforces cooldown
+  - `executePlan(epochId, planHash)` — executes only if stored hash matches and cooldown elapsed
+- Events:
+  - `PlanCommitted(epochId, planHash, manifestCid, earliestExecuteAt)`
+  - `PlanExecuted(epochId, planHash)`
+- Operational CLI flow:
+  1) Generate `distribution-plan.json`
+  2) Write/validate `MANIFEST.json` (capture Tenderly sim URL)
+  3) Call `commitPlan` (records `manifestCid`/cooldown)
+  4) After cooldown, call `executePlan`
+  5) Write `onchain/execution-receipt.json` and update MANIFEST
 
 ## Governance and Guardrails
 
@@ -215,6 +239,15 @@ Evaluate multiple secure options to run the publish/execute flows under guardrai
 - Decision: EAS attestations + contract events + GitHub receipts — Score: 10/10
   - EAS as on-chain source of truth; events for minimal immutable logs; GitHub mirrors for researchers
   - Artifacts: EAS schema id/version, attestation UIDs stored in `attestations/eas-uids.json`
+
+## Reviewer Documentation Bundle (per-epoch)
+
+- `docs/rubric.md`: the criteria evaluators will use
+- `docs/params.json`: emitted by pipeline; exact normalization/allocation parameters
+- `docs/SIMULATION.md`: links and screenshots of preflight simulations (Tenderly/Foundry traces)
+- `docs/REPRODUCE.md`: one‑liner commands to run the reproducibility script/notebook
+- Linting: CI job validates doc presence and non‑emptiness and checks links resolve
+- Cross‑links: MANIFEST should reference all `docs/` files for complete provenance
 
 ## Donations Ingestion (TBD)
 

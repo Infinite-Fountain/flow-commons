@@ -1,3 +1,44 @@
+ 
+2025-10-16T00:57:00Z | AI4PG Judge | First-Iteration Must-Haves
+
+- MANIFEST linking raw → normalized → plan → execution receipts, with code commit hashes
+  - Explanation & Benefit: Create a single `MANIFEST.json` per epoch listing all artifacts (paths, SHA-256 file hashes, sizes, timestamps) and the exact Git commit of the code used. This provides end‑to‑end provenance and tamper‑evidence. Reviewers can verify integrity, trace lineage across steps, and confidently reproduce results without ambiguity.
+  - Extra integration: Add `MANIFEST.schema.json` (artifacts[type,path,sha256,size,computedAt], code{repo,commit,tags,toolVersions}, params{file,hash}). CI re-hash step fails on mismatch. Attach MANIFEST to a GitHub Release (`category/page@vX.Y`). Optionally PGP-sign and store `manifestCid` (IPFS) alongside the plan.
+- Plan integrity: on-chain plan-hash commit + cooldown before execution
+  - Explanation & Benefit: Before payouts, the contract stores `keccak256(distribution-plan.json)` with `epochId` and enforces a cooldown timestamp. Execution checks hash equality and time window, otherwise reverts. This creates a binding between published artifacts and on‑chain actions, adds a human review window, and prevents last‑minute tampering or rushed errors.
+  - Extra integration: Contract: `commitPlan(epochId, planHash, manifestCid, earliestExecuteAt)`, `executePlan(epochId, planHash)`. Events: `PlanCommitted`, `PlanExecuted`. CLI flow: generate plan → write MANIFEST → commit plan (capture Tenderly sim URL) → wait cooldown → execute → write receipts.
+- Public reviewer docs: rubric, parameter file, and simulation evidence
+  - Explanation & Benefit: Publish a concise `docs/` bundle per epoch: `rubric.md` (criteria), `params.json` (normalization/allocation settings), and simulation links/screenshots (e.g., Tenderly URLs). Clear, standardized documentation accelerates review, clarifies assumptions, and demonstrates due diligence, improving trust and speeding acceptance by grant reviewers and researchers.
+  - Extra integration: Scripted generation of `docs/` per epoch, including `SIMULATION.md` (Tenderly/Foundry traces) and `REPRODUCE.md` (one-liner to run notebook). Add a docs linter (links exist, files non-empty). Cross-link all docs from MANIFEST.
+
+
+
+2025-10-16T00:55:00Z | we will wait MACI for later
+
+decision: Wait on MACI integration. This allows validation of core system before adding cryptographic voting complexity.
+
+Question to ai4pg-judge: Is there anything we should add to the blueprint, that is very important to you, and we should not skip in this first iteration? (skip everything that can wait for the next iteration). answer in short bulletpoints.
+
+
+2025-10-16T00:50:00Z | Agent Responses to MACI Voting Question
+
+**AI4PG Judge**: MACI voting aligns perfectly with AI4PG goals for transparent, verifiable public goods funding decisions. Provides cryptographic privacy while maintaining auditability - exactly what grant reviewers need. Complexity: Medium - well-documented implementation with existing tooling.
+
+**AI Agents Judge**: MACI adds significant complexity to our agent architecture. Need new MACI Coordinator Agent to handle key generation, vote encryption, tallying, and dispute resolution. Integration complexity: High - requires specialized cryptographic knowledge and additional infrastructure. Recommendation: Phase 2 feature after core system is stable.
+
+**Identity Connection Judge**: MACI complements UIR well - users can vote privately while maintaining canonical attribution. Need to map MACI public keys to canonicalUserId for reward distribution. Complexity: Medium - straightforward integration with existing UIR system.
+
+**Hashtag Judge**: MACI prevents vote buying and coercion, essential for authentic community participation. Aligns with hashtag project goals of genuine community engagement. Complexity: Medium - proven technology with good documentation.
+
+
+**Moderator**: MACI is valuable but adds complexity. Recommend implementing in phases: Phase 1 (current system), Phase 2 (MACI integration). This allows validation of core system before adding cryptographic voting complexity.
+
+Question to all the agents:
+Is it a good idea to add MACI voting to our blueprint? how complex would this be?
+https://github.com/privacy-ethereum/maci?tab=readme-ov-file
+
+
+
 2025-10-16T00:45:00Z | AI Agents Judge | UIR Agent Assessment
 - **Recommendation**: YES, add dedicated UIR Management Agent
 - **Rationale**: UIR operations are complex enough to warrant specialized agent - identity resolution, binding management, fallback handling, and cross-provider validation require focused expertise
