@@ -58,7 +58,10 @@
       }
     },
     "cmf7aj3en0043l80bqdj2wgvr": {
-      "instant-reward": 20,
+      "updatedAt": {
+        "seconds": 1757597718,
+        "nanoseconds": 199000000
+      },
       "scores": {
         "cmf9ylgib0049lb0blndaogai": 2,
         "cmfcnhbs800bqk30b2oskx05z": 3,
@@ -66,10 +69,6 @@
         "cmctq03o3010il80mru39gh56": 2,
         "cmf5xwjij00iqju0dkdpuwnqw": 3,
         "cmf78bdlm000lic0bkjidpszq": 2
-      },
-      "updatedAt": {
-        "seconds": 1757597718,
-        "nanoseconds": 199000000
       }
     },
     "cmf7c58q60027lh0bopo1fte4": {
