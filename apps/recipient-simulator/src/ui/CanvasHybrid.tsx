@@ -5,9 +5,9 @@ import { useCanvasStore } from './store'
 
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
-
 import { TextPrimitive, ImagePrimitive, PlaceholderPrimitive } from './components/Primitives'
 import { BackgroundLottieLayers } from './components/BackgroundLottieLayers'
+import { FreeformOverlay } from './FreeformOverlay'
 
 export function CanvasHybrid() {
   const { items, setItems } = useCanvasStore()
@@ -55,6 +55,7 @@ export function CanvasHybrid() {
           ))}
         </GridLayout>
       </DndContext>
+      <FreeformOverlay />
     </div>
   )
 }
