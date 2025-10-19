@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Rnd } from 'react-rnd'
 import { useCanvasStore } from './store'
+import { TextPrimitive, ImagePrimitive, PlaceholderPrimitive } from './components/Primitives'
 
 export function FreeformOverlay({ gridCols = 12, width = 960, rowHeight = 40 }: { gridCols?: number; width?: number; rowHeight?: number }) {
   const overlay = useCanvasStore((s) => s.overlay)
@@ -15,7 +16,7 @@ export function FreeformOverlay({ gridCols = 12, width = 960, rowHeight = 40 }: 
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
       <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 8 }}>
-        <button onClick={() => addOverlay({ id: String(Date.now()), x: 0, y: 0, w: colWidth * 2, h: rowHeight * 2 })}>Add Freeform Box</button>
+        <button onClick={() => addOverlay({ id: String(Date.now()), x: 0, y: 0, w: colWidth * 3, h: rowHeight * 4, contentType: 'none' })}>Add Box</button>
       </div>
       {overlay.map((it) => (
         <Rnd
@@ -35,10 +36,34 @@ export function FreeformOverlay({ gridCols = 12, width = 960, rowHeight = 40 }: 
           bounds="parent"
           style={{
             border: it.id === selectedId ? '2px solid #ffcf33' : '1px solid #666',
-            background: 'rgba(255,255,255,0.03)',
+            background: '#0e0e12',
             borderRadius: 8,
+            overflow: 'hidden',
           }}
-        />
+        >
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            {it.id === selectedId && (
+              <div style={{ position: 'absolute', top: 6, left: 6, zIndex: 2, display: 'flex', gap: 6, background: 'rgba(20,20,26,0.9)', padding: 6, borderRadius: 6 }}>
+                <button onClick={() => updateOverlay(it.id, { contentType: 'text', text: 'Sample Text' })}>Text</button>
+                <button onClick={() => updateOverlay(it.id, { contentType: 'image', imageSrc: 'https://picsum.photos/seed/pgf/800/600' })}>Image</button>
+                <button onClick={() => updateOverlay(it.id, { contentType: 'chart' })}>Chart</button>
+              </div>
+            )}
+            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
+              {it.contentType === 'text' ? (
+                <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center' }}>
+                  <TextPrimitive text={it.text} />
+                </div>
+              ) : it.contentType === 'image' ? (
+                <ImagePrimitive src={it.imageSrc ?? ''} alt="" />
+              ) : it.contentType === 'chart' ? (
+                <PlaceholderPrimitive label="Chart Placeholder" />
+              ) : (
+                <PlaceholderPrimitive label="Empty Box" />
+              )}
+            </div>
+          </div>
+        </Rnd>
       ))}
     </div>
   )

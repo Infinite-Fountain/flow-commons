@@ -10,12 +10,17 @@ export type GridItem = {
   type: 'chart' | 'image' | 'text' | 'snapshot'
 }
 
+export type OverlayContentType = 'none' | 'text' | 'image' | 'chart'
+
 export type OverlayItem = {
   id: string
   x: number // px
   y: number // px
   w: number // px
   h: number // px
+  contentType: OverlayContentType
+  text?: string
+  imageSrc?: string
 }
 
 type CanvasState = {
