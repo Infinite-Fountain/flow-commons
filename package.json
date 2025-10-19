@@ -1,0 +1,18 @@
+{
+  "name": "flow-commons",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm -w @flow-commons/canvas-ui run build && npm -w recipient-simulator run build",
+    "dev": "npm -w recipient-simulator run dev",
+    "lint": "echo 'add lints later'"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
+
