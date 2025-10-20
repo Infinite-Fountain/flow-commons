@@ -21,11 +21,17 @@ export type OverlayItem = {
   contentType: OverlayContentType
   text?: string
   imageSrc?: string
+  fontSize?: number
+  color?: string
+  bold?: boolean
+  align?: 'left' | 'center' | 'right'
 }
 
 type CanvasState = {
   aspect: '1:1' | '16:9' | '4:3'
   setAspect: (a: '1:1' | '16:9' | '4:3') => void
+  background: { mode: 'solid' | 'linear' | 'radial'; from: string; to: string }
+  setBackground: (b: { mode: 'solid' | 'linear' | 'radial'; from: string; to: string }) => void
   items: GridItem[]
   overlay: OverlayItem[]
   addItem: (item: GridItem) => void
@@ -39,6 +45,8 @@ export const useCanvasStore = create<CanvasState>()(
   immer((set) => ({
     aspect: '1:1',
     setAspect: (a) => set((s) => { s.aspect = a }),
+    background: { mode: 'solid', from: '#000000', to: '#000000' },
+    setBackground: (b) => set((s) => { s.background = b }),
     items: [],
     overlay: [],
     addItem: (item) => set((s) => { s.items.push(item) }),
