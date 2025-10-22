@@ -1,18 +1,46 @@
 {
-  "name": "flow-commons",
+  "name": "interoperable-canvas",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.0",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "build": "npm -w @flow-commons/canvas-ui run build && npm -w recipient-simulator run build",
-    "dev": "npm -w recipient-simulator run dev",
-    "lint": "echo 'add lints later'"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
-  "engines": {
-    "node": ">=22.12.0"
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@privy-io/react-auth": "^2.17.3",
+    "@types/react-grid-layout": "^1.3.5",
+    "ethers": "^6.15.0",
+    "firebase": "^11.9.1",
+    "firebase-admin": "^13.4.0",
+    "immer": "^10.1.3",
+    "lottie-react": "^2.4.1",
+    "lottie-web": "^5.13.0",
+    "next": "14.2.5",
+    "permissionless": "^0.2.49",
+    "react": "^18.2.0",
+    "react-colorful": "^5.6.1",
+    "react-dom": "^18.2.0",
+    "react-grid-layout": "^1.5.2",
+    "react-rnd": "^10.5.2",
+    "viem": "^2.31.7",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.5",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5"
   }
 }
 
