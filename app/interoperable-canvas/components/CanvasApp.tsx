@@ -9,6 +9,7 @@ import { useCanvasStore } from '@/app/interoperable-canvas/components/store'
 import { BackgroundGradientModal } from './BackgroundGradientModal'
 import LayersModal from '@/app/interoperable-canvas/components/LayersModal'
 import BoxContentModal from '@/app/interoperable-canvas/components/BoxContentModal'
+import ConnectWalletButton from '@/app/interoperable-canvas/components/ConnectWalletButton'
 
 import { initializeApp, getApps } from 'firebase/app'
 import { getFirestore, doc, onSnapshot, setDoc } from 'firebase/firestore'
@@ -119,6 +120,7 @@ export function CanvasApp({ projectId }: Props) {
   return (
     <div className="min-h-screen flex bg-gray-800">
       <div className="w-48 p-4 bg-gray-900 flex flex-col gap-3">
+        <ConnectWalletButton />
         <Toolbar />
         <RatioSelector onAspectChange={persistAspect} />
       </div>

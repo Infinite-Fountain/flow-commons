@@ -70,7 +70,21 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { pro
     const h = Math.max(minSize, draftRect.h)
     const id = createBox({ x: draftRect.x, y: draftRect.y, w, h })
     const itemRef = doc(db, 'interoperable-canvas', projectId, 'canvases', canvasId, 'overlay', id)
-    setDoc(itemRef, { id, x: Math.round(draftRect.x), y: Math.round(draftRect.y), w, h, contentType: 'none' }, { merge: true })
+    const toTimestampSuffix = () => {
+      const d = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const yyyy = d.getFullYear()
+      const MM = pad(d.getMonth() + 1)
+      const dd = pad(d.getDate())
+      const hh = pad(d.getHours())
+      const mm = pad(d.getMinutes())
+      const ss = pad(d.getSeconds())
+      return `${yyyy}${MM}${dd}${hh}${mm}${ss}`
+    }
+    const defaultIndex = (Array.isArray(overlay) ? overlay.length : 0) + 1
+    const defaultName = `Box ${defaultIndex}`
+    const defaultKey = `${defaultName}_${toTimestampSuffix()}`
+    setDoc(itemRef, { id, x: Math.round(draftRect.x), y: Math.round(draftRect.y), w, h, contentType: 'none', name: defaultName, nameKey: defaultKey }, { merge: true })
     setSelectedId(id)
     setDragStart(null)
     setDraftRect(null)
@@ -84,6 +98,32 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { pro
       const items: any[] = []
       snap.forEach((d) => items.push(d.data()))
       setOverlay(items as any)
+      // Build quick lookup for overlay names
+      const nameById: Record<string, string> = {}
+      items.forEach((it: any) => { if (it?.id) nameById[it.id] = it.name || it.id })
+
+      // Ensure layers include all overlay ids and keep names in sync
+      const existingById: Record<string, any> = {}
+      layers.forEach((l) => { existingById[l.id] = l })
+      const next: any[] = []
+      // Always include background at z 0
+      next.push({ id: 'background', name: 'Background', z: 0 })
+      // Add existing non-background layers in current order, updating names from overlay
+      layers.filter((l) => l.id !== 'background').forEach((l) => {
+        const updatedName = nameById[l.id] ?? l.name ?? l.id
+        next.push({ ...l, name: updatedName })
+      })
+      // Append any overlay items missing from layers
+      items.forEach((it) => {
+        if (!existingById[it.id]) {
+          next.push({ id: it.id, name: nameById[it.id] ?? it.id, z: next.length })
+        }
+      })
+      // Recompute z indices by creating new objects
+      const nextWithZ = next.map((l, i) => ({ ...l, z: i }))
+      // Only update if changed to avoid loops
+      const changed = nextWithZ.length !== layers.length || nextWithZ.some((l, i) => layers[i]?.id !== l.id || layers[i]?.name !== l.name)
+      if (changed) setLayers(nextWithZ as any)
     })
     return () => unsub()
   }, [projectId, canvasId, setOverlay])
