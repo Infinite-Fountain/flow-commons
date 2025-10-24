@@ -18,11 +18,12 @@ const firebaseConfig = {
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig as any)
 const db = getFirestore(app)
 
-export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { projectId?: string; canvasId?: string }) {
+export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope = { type: 'root' } as { type: 'root' } | { type: 'child'; childId: string } }: { projectId?: string; canvasId?: string; scope?: { type: 'root' } | { type: 'child'; childId: string } }) {
   const overlay = useCanvasStore((s) => s.overlay)
   const setOverlay = useCanvasStore((s) => s.setOverlay)
   const updateOverlay = useCanvasStore((s) => s.updateOverlay)
   const layers = useCanvasStore((s) => s.layers)
+  const setLayers = useCanvasStore((s) => s.setLayers)
   const createBox = useCanvasStore((s) => s.createBox)
   const currentTool = useCanvasStore((s) => s.ui.currentTool)
   const setTool = useCanvasStore((s) => s.setTool)
@@ -69,7 +70,7 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { pro
     const w = Math.max(minSize, draftRect.w)
     const h = Math.max(minSize, draftRect.h)
     const id = createBox({ x: draftRect.x, y: draftRect.y, w, h })
-    const itemRef = doc(db, 'interoperable-canvas', projectId, 'canvases', canvasId, 'overlay', id)
+    const itemRef = doc(db, pathForCanvasDoc().concat(['overlay', id]).join('/'))
     const toTimestampSuffix = () => {
       const d = new Date()
       const pad = (n: number) => String(n).padStart(2, '0')
@@ -91,9 +92,17 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { pro
     setTool('none')
   }
 
+  const pathForCanvasDoc = () => {
+    const base: string[] = ['interoperable-canvas', projectId!]
+    if ((scope as any)?.type === 'child') base.push('child-canvases', (scope as any).childId)
+    base.push('canvases', canvasId!)
+    return base
+  }
+
+  // Firestore live sync for overlay items
   useEffect(() => {
     if (!projectId) return
-    const col = collection(db, 'interoperable-canvas', projectId, 'canvases', canvasId, 'overlay')
+    const col = collection(db, pathForCanvasDoc().concat(['overlay']).join('/'))
     const unsub = onSnapshot(col, (snap) => {
       const items: any[] = []
       snap.forEach((d) => items.push(d.data()))
@@ -126,7 +135,7 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { pro
       if (changed) setLayers(nextWithZ as any)
     })
     return () => unsub()
-  }, [projectId, canvasId, setOverlay])
+  }, [projectId, canvasId, (scope as any)?.type === 'child' ? (scope as any).childId : 'root', setOverlay])
 
   return (
     <div
@@ -146,7 +155,7 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { pro
             const nx = Math.round(d.x)
             const ny = Math.round(d.y)
             updateOverlay(it.id, { x: nx, y: ny })
-            const itemRef = doc(db, 'interoperable-canvas', projectId, 'canvases', canvasId, 'overlay', it.id)
+            const itemRef = doc(db, pathForCanvasDoc().concat(['overlay', it.id]).join('/'))
             setDoc(itemRef, { x: nx, y: ny }, { merge: true })
           }}
           onResizeStop={(_, __, ref, ___, position) => {
@@ -155,13 +164,20 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { pro
             const nx = Math.round(position.x)
             const ny = Math.round(position.y)
             updateOverlay(it.id, { w: nw, h: nh, x: nx, y: ny })
-            const itemRef = doc(db, 'interoperable-canvas', projectId, 'canvases', canvasId, 'overlay', it.id)
+            const itemRef = doc(db, pathForCanvasDoc().concat(['overlay', it.id]).join('/'))
             setDoc(itemRef, { w: nw, h: nh, x: nx, y: ny }, { merge: true })
           }}
           bounds="parent"
           style={{
-            border: it.id === selectedId ? '2px solid #ffcf33' : '1px solid transparent',
-            background: 'transparent',
+            border: it.id === selectedId ? '2px solid #ffcf33' : '1px solid rgba(255,255,255,0.25)',
+            background: (() => {
+              const bg = (it as any).background
+              if (!bg || bg.mode === 'none') return 'transparent'
+              if (bg.mode === 'solid') return bg.from ?? '#000000'
+              if (bg.mode === 'linear') return `linear-gradient(135deg, ${bg.from ?? '#000000'}, ${bg.to ?? '#000000'})`
+              if (bg.mode === 'radial') return `radial-gradient(circle, ${bg.from ?? '#000000'}, ${bg.to ?? '#000000'})`
+              return 'transparent'
+            })(),
             borderRadius: 8,
             overflow: 'hidden',
             zIndex: idToZ[it.id] ?? 1,
@@ -169,7 +185,30 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { pro
           onClick={() => setSelectedId(it.id)}
           onDoubleClick={() => openBoxModal(it.id)}
         >
-          <div className="w-full h-full" />
+          <div className="w-full h-full">
+            {it.contentType === 'text' && (
+              <AutoFitText
+                text={(it as any).text?.content ?? ''}
+                color={(it as any).text?.color ?? '#ffffff'}
+                bold={!!(it as any).text?.bold}
+                align={(it as any).text?.align ?? 'left'}
+                fitToWidth={!!(it as any).text?.fitToWidth}
+                baseFontSize={(it as any).text?.fontSize ?? 18}
+              />
+            )}
+            {it.contentType === 'image' && (it as any).imageSrc && (
+              <img
+                src={(it as any).imageSrc}
+                alt=""
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: ((it as any).imageBehavior ?? 'contain') as 'contain' | 'cover',
+                  objectPosition: 'center',
+                }}
+              />
+            )}
+          </div>
         </Rnd>
       ))}
 
@@ -183,4 +222,95 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root' }: { pro
   )
 }
 
+function AutoFitText({
+  text,
+  color,
+  bold,
+  align,
+  fitToWidth,
+  baseFontSize,
+}: {
+  text: string
+  color: string
+  bold: boolean
+  align: 'left' | 'center' | 'right'
+  fitToWidth: boolean
+  baseFontSize: number
+}) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [fontSize, setFontSize] = useState<number>(baseFontSize)
+  const [lineHeight, setLineHeight] = useState<number>(1.2)
 
+  useEffect(() => {
+    if (!fitToWidth) {
+      setFontSize(baseFontSize)
+      setLineHeight(1.2)
+      return
+    }
+    
+    const node = ref.current
+    if (!node) return
+    const parent = node.parentElement
+    if (!parent) return
+    
+    const measure = () => {
+      const containerWidth = parent.clientWidth - 16 /* padding */
+      const containerHeight = parent.clientHeight - 16 /* padding */
+      
+      if (containerWidth <= 0 || containerHeight <= 0) return
+      
+      // Canvas-style fit: calculate optimal font size considering box dimensions and text length
+      const charCount = text.length
+      const avgCharWidth = 0.6 // Approximate character width ratio
+      const lineHeightRatio = 1.2
+      
+      // Calculate theoretical max font size based on width
+      const maxWidthFontSize = containerWidth / (charCount * avgCharWidth)
+      
+      // Calculate theoretical max font size based on height (assuming single line)
+      const maxHeightFontSize = containerHeight / lineHeightRatio
+      
+      // Calculate theoretical max font size for multi-line (estimate lines needed)
+      const estimatedLines = Math.ceil((charCount * avgCharWidth * baseFontSize) / containerWidth)
+      const maxMultiLineFontSize = containerHeight / (estimatedLines * lineHeightRatio)
+      
+      // Use the most conservative (smallest) font size to ensure text fits
+      const optimalFontSize = Math.min(maxWidthFontSize, maxHeightFontSize, maxMultiLineFontSize)
+      
+      // Clamp between reasonable bounds
+      const clampedFontSize = Math.max(8, Math.min(200, Math.floor(optimalFontSize)))
+      
+      setFontSize(clampedFontSize)
+      setLineHeight(lineHeightRatio)
+    }
+    
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(parent)
+    return () => { ro.disconnect() }
+  }, [fitToWidth, baseFontSize, text])
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        color,
+        fontSize,
+        fontWeight: bold ? 700 : 400,
+        lineHeight,
+        display: 'flex',
+        alignItems: 'center', // default vertical center
+        justifyContent: align === 'left' ? 'flex-start' : align === 'center' ? 'center' : 'flex-end',
+        width: '100%',
+        height: '100%',
+        padding: 8,
+        textAlign: align,
+        wordWrap: 'break-word',
+        overflowWrap: 'break-word',
+        whiteSpace: 'normal', // Allow wrapping
+      }}
+    >
+      {text}
+    </div>
+  )
+}

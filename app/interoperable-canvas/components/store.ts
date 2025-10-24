@@ -14,10 +14,10 @@ export type OverlayContentType = 'none' | 'text' | 'image' | 'chart'
 
 export type OverlayItem = {
   id: string
-  x: number
-  y: number
-  w: number
-  h: number
+  x: number // px
+  y: number // px
+  w: number // px
+  h: number // px
   contentType: OverlayContentType
   text?: string
   imageSrc?: string
@@ -34,8 +34,8 @@ export type Layer = {
 }
 
 export type CanvasState = {
-  aspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6'
-  setAspect: (a: '1:1' | '16:9' | '4:3' | '9:16' | '4:6') => void
+  aspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app'
+  setAspect: (a: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app') => void
   background: { mode: 'none' | 'solid' | 'linear' | 'radial'; from: string; to: string }
   setBackground: (b: { mode: 'none' | 'solid' | 'linear' | 'radial'; from: string; to: string }) => void
   items: GridItem[]
@@ -96,12 +96,14 @@ export const useCanvasStore = create<CanvasState>()(
         const tmp = s.layers[idx]
         s.layers[idx] = s.layers[idx + 1]
         s.layers[idx + 1] = tmp
+        // recompute z values
         s.layers.forEach((l, i) => { l.z = i })
       }
     }),
     moveLayerDown: (id) => set((s) => {
       const idx = s.layers.findIndex((l) => l.id === id)
       if (idx > 0) {
+        // Do not allow swapping below background
         if (s.layers[idx - 1]?.id === 'background') return
         const tmp = s.layers[idx]
         s.layers[idx] = s.layers[idx - 1]
@@ -126,7 +128,7 @@ export const useCanvasStore = create<CanvasState>()(
       const minW = Math.max(16, Math.round(rect.w))
       const minH = Math.max(16, Math.round(rect.h))
       set((s) => {
-        const nextZ = s.layers.length
+        const nextZ = s.layers.length // background at 0, so next index is top-most
         s.overlay.push({ id: newId!, x: Math.round(rect.x), y: Math.round(rect.y), w: minW, h: minH, contentType: rect.contentType ?? 'none' })
         s.layers.push({ id: newId!, name: rect.name ?? newId!, z: nextZ })
         s.ui.currentTool = 'none'
@@ -136,5 +138,3 @@ export const useCanvasStore = create<CanvasState>()(
     },
   }))
 )
-
-
