@@ -19,7 +19,7 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig as an
 const db = getFirestore(app)
 const storage = getStorage(app)
 
-export default function BoxContentModal({ projectId = 'demo', canvasId = 'root' }: { projectId?: string; canvasId?: string }) {
+export default function BoxContentModal({ projectId = 'demo', canvasId = 'root', scope = { type: 'root' } as { type: 'root' } | { type: 'child'; childId: string } }: { projectId?: string; canvasId?: string; scope?: { type: 'root' } | { type: 'child'; childId: string } }) {
   const open = useCanvasStore((s: any) => s.ui.showBoxModal)
   const close = useCanvasStore((s: any) => s.closeBoxModal)
   const selectedId = useCanvasStore((s: any) => s.selectedId)
@@ -125,7 +125,9 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root' 
       const base = dot > -1 ? originalName.slice(0, dot) : originalName
       const ext = dot > -1 ? originalName.slice(dot + 1) : 'jpg'
       const uniqueFilename = `${base}_${toTimestampSuffix()}.${ext}`
-      const storagePath = `interoperable-canvas/assets/${projectId}/images/${uniqueFilename}`
+      const storagePath = (scope as any)?.type === 'child'
+        ? `interoperable-canvas/assets/${projectId}/child-canvases/${(scope as any).childId}/images/${uniqueFilename}`
+        : `interoperable-canvas/assets/${projectId}/images/${uniqueFilename}`
       const ref = storageRef(storage, storagePath)
       await uploadBytes(ref, file, {
         contentType: file.type,
@@ -173,9 +175,16 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root' 
     }
   }
 
+  const pathForCanvasDoc = () => {
+    const base: string[] = ['interoperable-canvas', projectId!]
+    if ((scope as any)?.type === 'child') base.push('child-canvases', (scope as any).childId)
+    base.push('canvases', canvasId!)
+    return base
+  }
+
   const save = async () => {
     if (!selectedId) return
-    const ref = doc(db, 'interoperable-canvas', projectId, 'canvases', canvasId, 'overlay', selectedId)
+    const ref = doc(db, pathForCanvasDoc().concat(['overlay', selectedId]).join('/'))
     // Merge polymorphic fields per chosen tab
     const payload: any = {}
     if (tab === 'background') {
@@ -232,11 +241,11 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root' 
     if (!selectedId) return
     try {
       // 1) Delete overlay doc (hard delete)
-      const overlayRef = doc(db, 'interoperable-canvas', projectId, 'canvases', canvasId, 'overlay', selectedId)
+      const overlayRef = doc(db, pathForCanvasDoc().concat(['overlay', selectedId]).join('/'))
       await deleteDoc(overlayRef)
 
       // 2) Remove from layers and reindex zIndexMap
-      const canvasRef = doc(db, 'interoperable-canvas', projectId, 'canvases', canvasId)
+      const canvasRef = doc(db, pathForCanvasDoc().join('/'))
       const snap = await getDoc(canvasRef)
       if (snap.exists()) {
         const data: any = snap.data()
@@ -510,4 +519,5 @@ function InlineNameEditor({ projectId, canvasId, selectedId, initialName }: { pr
     />
   )
 }
+
 

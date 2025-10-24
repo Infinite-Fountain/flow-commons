@@ -1,4 +1,3 @@
-
 'use client'
 
 import React, { useRef, useState } from 'react'
@@ -18,7 +17,7 @@ const firebaseConfig = {
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig as any)
 const db = getFirestore(app)
 
-export default function LayersModal({ open, onClose, projectId, canvasId = 'root' }: { open: boolean; onClose: () => void; projectId: string; canvasId?: string }) {
+export default function LayersModal({ open, onClose, projectId, canvasId = 'root', scope = { type: 'root' } as { type: 'root' } | { type: 'child'; childId: string } }: { open: boolean; onClose: () => void; projectId: string; canvasId?: string; scope?: { type: 'root' } | { type: 'child'; childId: string } }) {
   const layers = useCanvasStore((s: any) => s.layers)
   const overlay = useCanvasStore((s: any) => s.overlay)
   const moveLayerUp = useCanvasStore((s: any) => s.moveLayerUp)
@@ -42,10 +41,17 @@ export default function LayersModal({ open, onClose, projectId, canvasId = 'root
     return `${yyyy}${MM}${dd}${hh}${mm}${ss}`
   }
 
+  const pathForCanvasDoc = () => {
+    const base: string[] = ['interoperable-canvas', projectId]
+    if ((scope as any)?.type === 'child') base.push('child-canvases', (scope as any).childId)
+    base.push('canvases', canvasId!)
+    return base
+  }
+
   const saveName = async (id: string, name: string) => {
     if (!name.trim() || !projectId) { setEditingId(null); return }
     const uniqueKey = `${name.trim()}_${toTimestampSuffix()}`
-    const ref = doc(db, 'interoperable-canvas', projectId, 'canvases', canvasId, 'overlay', id)
+    const ref = doc(db, pathForCanvasDoc().concat(['overlay', id]).join('/'))
     await setDoc(ref, { name: name.trim(), nameKey: uniqueKey }, { merge: true })
     setEditingId(null)
   }
@@ -118,4 +124,5 @@ export default function LayersModal({ open, onClose, projectId, canvasId = 'root
     </div>
   )
 }
+
 
