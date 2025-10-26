@@ -1,10 +1,12 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import Lottie from 'lottie-react'
 import { Rnd } from 'react-rnd'
 import { useCanvasStore } from './store'
 import { initializeApp, getApps } from 'firebase/app'
 import { getFirestore, collection, doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { getStorage, ref as storageRef, getBytes } from 'firebase/storage'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,6 +19,7 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig as any)
 const db = getFirestore(app)
+const storage = getStorage(app)
 
 export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope = { type: 'root' } as { type: 'root' } | { type: 'child'; childId: string } }: { projectId?: string; canvasId?: string; scope?: { type: 'root' } | { type: 'child'; childId: string } }) {
   const overlay = useCanvasStore((s) => s.overlay)
@@ -208,6 +211,13 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
                 }}
               />
             )}
+            {it.contentType === 'animation' && (it as any).lottieSrc && (
+              <LottieAnimationRenderer
+                lottieSrc={(it as any).lottieSrc}
+                loop={(it as any).loop ?? true}
+                autoplay={(it as any).autoplay ?? true}
+              />
+            )}
           </div>
         </Rnd>
       ))}
@@ -312,5 +322,66 @@ function AutoFitText({
     >
       {text}
     </div>
+  )
+}
+
+function LottieAnimationRenderer({ lottieSrc, loop, autoplay }: { lottieSrc: string; loop: boolean | number; autoplay: boolean }) {
+  const [animationData, setAnimationData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadAnimation = async () => {
+      try {
+        setLoading(true)
+        // Extract storage path from Firebase Storage URL
+        // URL format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?alt=media&token=...
+        const urlParts = lottieSrc.split('/o/')
+        if (urlParts.length !== 2) {
+          throw new Error('Invalid Lottie URL format')
+        }
+        const encodedPath = urlParts[1].split('?')[0] // Remove query params
+        const storageRefPath = decodeURIComponent(encodedPath) // Decode URL encoding (%2F -> /)
+        
+        const ref = storageRef(storage, storageRefPath)
+        const bytes = await getBytes(ref)
+        const text = new TextDecoder().decode(bytes)
+        const data = JSON.parse(text)
+        setAnimationData(data)
+      } catch (err) {
+        console.error('Failed to load Lottie animation:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (lottieSrc) {
+      loadAnimation()
+    }
+  }, [lottieSrc])
+
+  if (loading || !animationData) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+        <div className="text-xs text-gray-500">Loading...</div>
+      </div>
+    )
+  }
+
+  return (
+    <Lottie
+      animationData={animationData}
+      loop={typeof loop === 'boolean' ? loop : loop > 0}
+      autoplay={autoplay}
+      style={{ width: '100%', height: '100%' }}
+      {...({
+        renderer: 'canvas' as const,
+        rendererSettings: {
+          progressiveLoad: true,
+          clearCanvas: true,
+          preserveAspectRatio: 'none',
+          dpr: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+        },
+      } as any)}
+    />
   )
 }

@@ -10,7 +10,7 @@ export type GridItem = {
   type: 'chart' | 'image' | 'text' | 'snapshot'
 }
 
-export type OverlayContentType = 'none' | 'text' | 'image' | 'chart'
+export type OverlayContentType = 'none' | 'text' | 'image' | 'chart' | 'animation'
 
 export type OverlayItem = {
   id: string
@@ -21,6 +21,9 @@ export type OverlayItem = {
   contentType: OverlayContentType
   text?: string
   imageSrc?: string
+  lottieSrc?: string // URL to Lottie JSON file
+  loop?: boolean | number // true for infinite, number for specific count
+  autoplay?: boolean
   fontSize?: number
   color?: string
   bold?: boolean

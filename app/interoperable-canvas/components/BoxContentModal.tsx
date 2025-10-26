@@ -1,10 +1,11 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import Lottie from 'lottie-react'
 import { useCanvasStore } from './store'
 import { initializeApp, getApps } from 'firebase/app'
 import { doc, getFirestore, setDoc, deleteField, collection, getDocs, query, limit, serverTimestamp, getDoc, deleteDoc } from 'firebase/firestore'
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, getBytes } from 'firebase/storage'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -30,9 +31,11 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root',
   const [draft, setDraft] = useState<any>({})
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const lottieFileInputRef = useRef<HTMLInputElement | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null)
+  const [lottieAnimationData, setLottieAnimationData] = useState<any>(null)
   const [hasImages, setHasImages] = useState(false)
   const [showBrowse, setShowBrowse] = useState(false)
   const [images, setImages] = useState<Array<{ id: string; name: string; url: string }>>([])
@@ -103,6 +106,37 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root',
       setTab('background')
     }
   }, [open, selectedId, item?.contentType])
+
+  // Load existing Lottie animation data when modal opens with animation content
+  useEffect(() => {
+    if (!open || !item?.lottieSrc) return
+    if (item.contentType !== 'animation') return
+    
+    // Load animation from Firebase Storage if we have a URL
+    const loadAnimationData = async () => {
+      try {
+        // Extract storage path from Firebase Storage URL
+        // URL format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?alt=media&token=...
+        const urlParts = item.lottieSrc.split('/o/')
+        if (urlParts.length !== 2) {
+          console.error('Invalid Lottie URL format')
+          return
+        }
+        const encodedPath = urlParts[1].split('?')[0] // Remove query params
+        const storageRefPath = decodeURIComponent(encodedPath) // Decode URL encoding (%2F -> /)
+        
+        const ref = storageRef(storage, storageRefPath)
+        const bytes = await getBytes(ref)
+        const text = new TextDecoder().decode(bytes)
+        const data = JSON.parse(text)
+        setLottieAnimationData(data)
+      } catch (err) {
+        console.error('Failed to load existing Lottie animation:', err)
+      }
+    }
+    
+    loadAnimationData()
+  }, [open, item?.lottieSrc, item?.contentType])
 
   if (!open || !selectedId) return null
 
@@ -175,6 +209,65 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root',
     }
   }
 
+  const handleUploadLottie = async (file: File) => {
+    setUploadError(null)
+    if (!file) return
+    const okType = file.type === 'application/json' || file.name.endsWith('.json')
+    if (!okType) {
+      setUploadError('Only JSON files are accepted.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('Maximum size is 2MB.')
+      return
+    }
+    setIsUploading(true)
+    try {
+      const originalName = file.name
+      const dot = originalName.lastIndexOf('.')
+      const base = dot > -1 ? originalName.slice(0, dot) : originalName
+      const uniqueFilename = `${base}_${toTimestampSuffix()}.json`
+      const storagePath = (scope as any)?.type === 'child'
+        ? `interoperable-canvas/assets/${projectId}/child-canvases/${(scope as any).childId}/animations/${uniqueFilename}`
+        : `interoperable-canvas/assets/${projectId}/animations/${uniqueFilename}`
+      const ref = storageRef(storage, storagePath)
+      await uploadBytes(ref, file, {
+        contentType: 'application/json',
+        cacheControl: 'public, max-age=31536000, immutable',
+      })
+      const url = await getDownloadURL(ref)
+
+      // Parse and store JSON for preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const json = JSON.parse(e.target?.result as string)
+          setLottieAnimationData(json)
+          setDraft({ ...draft, lottieSrc: url })
+        } catch (err) {
+          console.error('Failed to parse Lottie JSON:', err)
+          setUploadError('Invalid Lottie JSON file.')
+        }
+      }
+      reader.readAsText(file)
+
+      // Store metadata in Firestore (animations collection)
+      const animDocRef = doc(db, 'interoperable-canvas', projectId, 'animations', uniqueFilename)
+      await setDoc(animDocRef, {
+        filename: uniqueFilename,
+        originalName,
+        storagePath,
+        mimeType: 'application/json',
+        sizeBytes: file.size,
+        uploadedAt: serverTimestamp(),
+      }, { merge: true })
+    } catch (e: any) {
+      setUploadError('Upload failed. Please try again.')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   const pathForCanvasDoc = () => {
     const base: string[] = ['interoperable-canvas', projectId!]
     if ((scope as any)?.type === 'child') base.push('child-canvases', (scope as any).childId)
@@ -226,7 +319,17 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root',
       Object.assign(payload, { text: deleteField(), lottieSrc: deleteField(), duneQueryId: deleteField() })
     }
     if (tab === 'animation') {
-      Object.assign(payload, { contentType: 'animation', lottieSrc: draft.lottieSrc })
+      const lottieSrc = draft.lottieSrc ?? item?.lottieSrc
+      if (!lottieSrc) {
+        window.alert('Please upload a Lottie JSON file before saving.')
+        return
+      }
+      Object.assign(payload, {
+        contentType: 'animation',
+        lottieSrc,
+        loop: draft.loop !== undefined ? draft.loop : item?.loop ?? true,
+        autoplay: draft.autoplay !== undefined ? draft.autoplay : item?.autoplay ?? true,
+      })
       Object.assign(payload, { text: deleteField(), imageSrc: deleteField(), duneQueryId: deleteField() })
     }
     if (tab === 'dune') {
@@ -452,10 +555,118 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root',
           )}
           {tab === 'animation' && (
             <div className="grid gap-2 text-xs">
-              <label className="grid gap-1">
-                <span>Lottie JSON URL</span>
-                <input value={draft.lottieSrc ?? item?.lottieSrc ?? ''} onChange={(e) => setDraft({ ...draft, lottieSrc: e.target.value })} />
+              <div className="text-[11px] text-gray-600">
+                Upload Lottie JSON file (max 2MB).
+              </div>
+              {uploadError && (
+                <div className="text-[11px] text-red-600">{uploadError}</div>
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-50"
+                  onClick={() => lottieFileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  {isUploading ? 'Uploading…' : 'Upload Lottie JSON'}
+                </button>
+                <input
+                  ref={lottieFileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) handleUploadLottie(f)
+                    e.currentTarget.value = ''
+                  }}
+                />
+              </div>
+
+              {/* Loop Configuration */}
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={draft.loopEnabled !== undefined ? draft.loopEnabled : (item?.loop ? typeof item.loop === 'boolean' && item.loop : true)}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    if (checked) {
+                      setDraft({ ...draft, loopEnabled: true, loop: true })
+                    } else {
+                      setDraft({ ...draft, loopEnabled: false, loop: false })
+                    }
+                  }}
+                />
+                <span>Loop animation</span>
               </label>
+
+              {/* Loop count input - shown only when loop is enabled */}
+              {((draft.loopEnabled !== undefined ? draft.loopEnabled : (item?.loop ? typeof item.loop === 'boolean' && item.loop : true))) && (
+                <div className="grid gap-1">
+                  <select
+                    value={draft.loopMode ?? 'infinite'}
+                    onChange={(e) => {
+                      if (e.target.value === 'infinite') {
+                        setDraft({ ...draft, loop: true, loopMode: 'infinite' })
+                      } else {
+                        const count = draft.loopCount ?? 3
+                        setDraft({ ...draft, loop: count, loopMode: 'count' })
+                      }
+                    }}
+                    className="text-xs border rounded p-1"
+                  >
+                    <option value="infinite">Infinite</option>
+                    <option value="count">Count</option>
+                  </select>
+                  {draft.loopMode === 'count' && (
+                    <input
+                      type="number"
+                      min="1"
+                      max="999"
+                      value={draft.loopCount ?? 3}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 1
+                        setDraft({ ...draft, loopCount: val, loop: val })
+                      }}
+                      className="text-xs border rounded p-1"
+                      placeholder="Loop count"
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Autoplay Toggle */}
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={draft.autoplay !== undefined ? draft.autoplay : (item?.autoplay ?? true)}
+                  onChange={(e) => setDraft({ ...draft, autoplay: e.target.checked })}
+                />
+                <span>Autoplay</span>
+              </label>
+
+              {/* 100x100 Preview */}
+              {(lottieAnimationData || (draft.lottieSrc || item?.lottieSrc)) && (
+                <div className="mt-2">
+                  <div className="text-[11px] text-gray-600 mb-1">Preview</div>
+                  <div className="w-[100px] h-[100px] bg-white border rounded overflow-hidden flex items-center justify-center">
+                    <Lottie
+                      animationData={lottieAnimationData}
+                      loop={true}
+                      autoplay={true}
+                      style={{ width: '100%', height: '100%' }}
+                      {...({
+                        renderer: 'canvas' as const,
+                        rendererSettings: {
+                          progressiveLoad: true,
+                          clearCanvas: true,
+                          preserveAspectRatio: 'none',
+                          dpr: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
+                        },
+                      } as any)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {tab === 'dune' && (
