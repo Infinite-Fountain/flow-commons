@@ -10,7 +10,7 @@ export type GridItem = {
   type: 'chart' | 'image' | 'text' | 'snapshot'
 }
 
-export type OverlayContentType = 'none' | 'text' | 'image' | 'chart' | 'animation'
+export type OverlayContentType = 'none' | 'text' | 'image' | 'chart' | 'animation' | 'dune'
 
 export type OverlayItem = {
   id: string

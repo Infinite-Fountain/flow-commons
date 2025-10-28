@@ -29,6 +29,7 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root',
 
   const [tab, setTab] = useState<'background' | 'text' | 'image' | 'animation' | 'dune'>('background')
   const [draft, setDraft] = useState<any>({})
+  const [duneValues, setDuneValues] = useState<string[]>([''])
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const lottieFileInputRef = useRef<HTMLInputElement | null>(null)
@@ -104,6 +105,11 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root',
       setTab(existingType)
     } else {
       setTab('background')
+    }
+    if (existingType === 'dune' && (item as any)?.dune?.valueColumns) {
+      setDuneValues((item as any).dune.valueColumns)
+    } else if (duneValues.length === 0) {
+      setDuneValues([''])
     }
   }, [open, selectedId, item?.contentType])
 
@@ -333,7 +339,30 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root',
       Object.assign(payload, { text: deleteField(), imageSrc: deleteField(), duneQueryId: deleteField() })
     }
     if (tab === 'dune') {
-      Object.assign(payload, { contentType: 'dune', duneQueryId: draft.duneQueryId })
+      const rawInput: string = (draft.duneInput ?? draft.duneQueryId ?? (item as any)?.dune?.sourceUrl ?? (item as any)?.dune?.queryId ?? (item as any)?.duneQueryId ?? '').toString().trim()
+      const { queryId, vizId, sourceUrl } = parseDuneInput(rawInput)
+      if (!queryId) {
+        window.alert('Please provide a valid Dune URL or numeric query_id.')
+        return
+      }
+      const resolvedSourceUrl = sourceUrl || `https://dune.com/queries/${queryId}${vizId ? '/' + vizId : ''}`
+      const datesToShow = draft.datesToShow ?? (item as any)?.dune?.datesToShow ?? 4
+      const datesColumn = draft.datesColumn ?? (item as any)?.dune?.datesColumn ?? ''
+      const valueColumns = duneValues.filter((v) => v.trim() !== '')
+      Object.assign(payload, {
+        contentType: 'dune',
+        dune: {
+          provider: 'dune',
+          queryId,
+          ...(vizId ? { vizId } : {}),
+          sourceUrl: resolvedSourceUrl,
+          version: 0,
+          datesToShow,
+          datesColumn,
+          valueColumns,
+        },
+        duneQueryId: deleteField(),
+      })
       Object.assign(payload, { text: deleteField(), imageSrc: deleteField(), lottieSrc: deleteField() })
     }
     await setDoc(ref, payload, { merge: true })
@@ -672,9 +701,62 @@ export default function BoxContentModal({ projectId = 'demo', canvasId = 'root',
           {tab === 'dune' && (
             <div className="grid gap-2 text-xs">
               <label className="grid gap-1">
-                <span>Dune Query ID</span>
-                <input value={draft.duneQueryId ?? item?.duneQueryId ?? ''} onChange={(e) => setDraft({ ...draft, duneQueryId: e.target.value })} />
+                <span>Dune URL or Query ID</span>
+                <input
+                  placeholder="https://dune.com/queries/4880231/8081146 or 4880231"
+                  value={draft.duneInput ?? draft.duneQueryId ?? (item as any)?.dune?.sourceUrl ?? (item as any)?.dune?.queryId ?? (item as any)?.duneQueryId ?? ''}
+                  onChange={(e) => setDraft({ ...draft, duneInput: e.target.value })}
+                />
               </label>
+              <label className="grid gap-1">
+                <span>Dates column (e.g. "week")</span>
+                <input
+                  placeholder="week"
+                  value={draft.datesColumn ?? (item as any)?.dune?.datesColumn ?? ''}
+                  onChange={(e) => setDraft({ ...draft, datesColumn: e.target.value })}
+                />
+              </label>
+              <label className="grid gap-1">
+                <span>Dates to show</span>
+                <input
+                  type="number"
+                  min="2"
+                  max="20"
+                  placeholder="4"
+                  value={draft.datesToShow ?? (item as any)?.dune?.datesToShow ?? 4}
+                  onChange={(e) => setDraft({ ...draft, datesToShow: parseInt(e.target.value) || 4 })}
+                />
+              </label>
+              <div className="grid gap-1">
+                <span>Value(s) to visualize</span>
+                {duneValues.map((val, idx) => (
+                  <div key={idx} className="flex gap-1">
+                    <input
+                      placeholder="e.g. total_members_all_networks"
+                      value={val}
+                      onChange={(e) => {
+                        const updated = [...duneValues]
+                        updated[idx] = e.target.value
+                        setDuneValues(updated)
+                      }}
+                    />
+                    {duneValues.length > 1 && (
+                      <button
+                        className="px-2 py-1 text-xs border rounded bg-red-100 text-red-700 hover:bg-red-200"
+                        onClick={() => setDuneValues(duneValues.filter((_, i) => i !== idx))}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  className="px-2 py-1 text-xs border rounded bg-gray-100 hover:bg-gray-200"
+                  onClick={() => setDuneValues([...duneValues, ''])}
+                >
+                  + Add another value
+                </button>
+              </div>
             </div>
           )}
         </div>

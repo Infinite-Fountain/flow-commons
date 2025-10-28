@@ -218,6 +218,9 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
                 autoplay={(it as any).autoplay ?? true}
               />
             )}
+            {it.contentType === 'dune' && (
+              <DuneBoxPlaceholder dune={(it as any).dune} />
+            )}
           </div>
         </Rnd>
       ))}
