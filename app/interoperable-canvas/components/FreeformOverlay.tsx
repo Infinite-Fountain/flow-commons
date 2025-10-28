@@ -388,3 +388,207 @@ function LottieAnimationRenderer({ lottieSrc, loop, autoplay }: { lottieSrc: str
     />
   )
 }
+
+function DuneBoxPlaceholder({ dune }: { dune?: any }) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const chartRef = useRef<HTMLCanvasElement | null>(null)
+  const chartInstanceRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (!dune?.queryId) {
+      setLoading(false)
+      setError('No query ID configured')
+      return
+    }
+    const fetchData = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`/api/dune/latest?queryId=${encodeURIComponent(dune.queryId)}`)
+        const json = await res.json()
+        if (!json.ok) {
+          throw new Error(json.error || 'API error')
+        }
+        setData(json.data)
+      } catch (e: any) {
+        setError(e.message || 'Failed to load')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [dune?.queryId])
+
+  useEffect(() => {
+    const rows = data?.result?.rows ?? []
+    if (!chartRef.current || rows.length === 0) return
+
+    if (chartInstanceRef.current) {
+      chartInstanceRef.current.destroy()
+      chartInstanceRef.current = null
+    }
+
+    const headers = Object.keys(rows[0] ?? [])
+    const datesColumn = dune?.datesColumn ?? ''
+    const labelColumn = datesColumn && headers.includes(datesColumn) ? datesColumn : headers.find((h) => typeof rows[0]?.[h] === 'string') || headers[0]
+    const specifiedValueColumns = dune?.valueColumns?.filter((col: string) => col.trim() !== '' && headers.includes(col)) ?? []
+    const valueColumns = specifiedValueColumns.length > 0 ? specifiedValueColumns : headers.filter((h) => h !== labelColumn && typeof rows[0]?.[h] === 'number')
+    if (valueColumns.length === 0) return
+
+    const parseDateSafe = (value: any): Date | null => {
+      if (value == null) return null
+      if (typeof value === 'number') {
+        const d = new Date(value)
+        return Number.isNaN(d.getTime()) ? null : d
+      }
+      if (typeof value === 'string') {
+        const s = value.trim()
+        const isoTry = new Date(s)
+        if (!Number.isNaN(isoTry.getTime())) return isoTry
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/)
+        if (m) {
+          const year = Number(m[1])
+          const month = Number(m[2]) - 1
+          const day = Number(m[3])
+          const hh = Number(m[4] ?? '0')
+          const mm = Number(m[5] ?? '0')
+          const ss = Number(m[6] ?? '0')
+          const t = Date.UTC(year, month, day, hh, mm, ss)
+          const d = new Date(t)
+          return Number.isNaN(d.getTime()) ? null : d
+        }
+      }
+      return null
+    }
+
+    let sortedRows = rows.slice()
+    const rowsWithTimestamps = rows
+      .map((r: any) => ({ r, d: parseDateSafe(r[labelColumn]), ts: parseDateSafe(r[labelColumn])?.getTime() ?? 0 }))
+      .filter((x: { r: any; d: Date | null; ts: number }) => !!x.d && x.ts > 0)
+
+    if (rowsWithTimestamps.length > 0) {
+      sortedRows = rowsWithTimestamps
+        .sort((a: { r: any; d: Date | null; ts: number }, b: { r: any; d: Date | null; ts: number }) => a.ts - b.ts)
+        .map((x: { r: any; d: Date | null; ts: number }) => x.r)
+    }
+
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const formatDate = (v: any) => {
+      if (typeof v === 'string' && v.includes('-') && v.length > 10) {
+        const d = new Date(v)
+        if (!Number.isNaN(d.getTime())) {
+          return `${monthShort[d.getUTCMonth()]}-${d.getUTCFullYear()}`
+        }
+      }
+      const d = parseDateSafe(v)
+      if (!d) return String(v ?? '')
+      return `${monthShort[d.getUTCMonth()]}-${d.getUTCFullYear()}`
+    }
+
+    const labels = sortedRows.map((r: any) => formatDate(r[labelColumn]))
+
+    import('chart.js/auto').then((chartjs) => {
+      const Chart = chartjs.default
+      const ctx = chartRef.current?.getContext('2d')
+      if (!ctx) return
+
+      const numDatesToShow = Math.max(2, dune?.datesToShow ?? 4)
+      const totalPoints = labels.length
+      const labelIndices: number[] = []
+      for (let i = 0; i < numDatesToShow; i++) {
+        const ratio = numDatesToShow === 1 ? 0.5 : i / (numDatesToShow - 1)
+        const idx = Math.round(ratio * (totalPoints - 1))
+        labelIndices.push(idx)
+      }
+
+      const colors = [
+        { border: 'hsl(28, 90%, 50%)', fill: 'hsla(28, 90%, 50%, 0.20)' },
+        { border: 'hsl(210, 70%, 50%)', fill: 'hsla(210, 70%, 50%, 0.20)' },
+        { border: 'hsl(120, 70%, 50%)', fill: 'hsla(120, 70%, 50%, 0.20)' },
+        { border: 'hsl(0, 70%, 50%)', fill: 'hsla(0, 70%, 50%, 0.20)' },
+      ]
+
+      const datasets = valueColumns.map((col: string, idx: number) => ({
+        label: col,
+        data: sortedRows.map((r: any) => r[col]),
+        borderColor: colors[idx % colors.length].border,
+        backgroundColor: colors[idx % colors.length].fill,
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+        borderWidth: 2,
+      }))
+
+      chartInstanceRef.current = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false }, tooltip: { enabled: true } },
+          scales: {
+            x: {
+              type: 'category',
+              display: true,
+              grid: { display: false },
+              afterBuildTicks: (axis: any) => {
+                axis.ticks = labelIndices.map((idx) => ({ value: idx, label: labels[idx] }))
+              },
+              ticks: { callback: function(this: any, value: any) { return this.getLabelForValue(value) } },
+            },
+            y: { display: false, grid: { display: false }, beginAtZero: true },
+          },
+          elements: { line: { borderJoinStyle: 'round' } },
+        }
+      })
+    }).catch(() => {})
+
+    return () => {
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.destroy()
+        chartInstanceRef.current = null
+      }
+    }
+  }, [data, dune])
+
+  if (!dune?.queryId) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-900/40 text-gray-200 text-xs px-2">
+        Add a Dune URL or query_id in the box settings.
+      </div>
+    )
+  }
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-900/40 text-gray-200 text-xs">
+        <div>Loading Dune data...</div>
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-900/40 text-red-300 text-xs px-2">
+        <div className="text-center">
+          <div className="font-semibold">Error</div>
+          <div>{error}</div>
+        </div>
+      </div>
+    )
+  }
+  const rows = data?.result?.rows ?? []
+  if (rows.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-900/40 text-gray-200 text-xs">
+        <div>No data returned from query</div>
+      </div>
+    )
+  }
+  return (
+    <div className="w-full h-full relative" style={{ background: 'white' }}>
+      <canvas ref={chartRef} className="absolute inset-0 w-full h-full" />
+    </div>
+  )
+}
