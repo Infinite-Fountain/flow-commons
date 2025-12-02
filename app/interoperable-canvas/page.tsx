@@ -1,6 +1,6 @@
 'use client'
 
-import React, { Suspense, useState } from 'react'
+import React, { Suspense, useState, useEffect } from 'react'
 import ConnectWalletButton from './components/ConnectWalletButton'
 import { initializeApp, getApps } from 'firebase/app'
 import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore'
@@ -151,11 +151,41 @@ export default function InteroperableCanvasHomePage() {
 function ProjectRouter() {
   const searchParams = useSearchParams()
   const requestedProjectId = searchParams?.get('projectId') || null
+  const childId = searchParams?.get('childId') || null
+  
+  // Client-side redirect based on screen width (Option 1: Client-Side Redirect)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!childId) return // No redirect needed if no childId
+    
+    const urlParams = new URLSearchParams(window.location.search)
+    const isMobile = window.innerWidth <= 850
+    
+    const isDesktopChild = childId.includes('-desktop')
+    const isMobileChild = childId.includes('-mobile')
+    
+    // Redirect mobile users from desktop childId to mobile childId
+    if (isMobile && isDesktopChild) {
+      const newChildId = childId.replace('-desktop', '-mobile')
+      urlParams.set('childId', newChildId)
+      window.location.replace(`${window.location.pathname}?${urlParams.toString()}`)
+      return
+    }
+    
+    // Redirect desktop users from mobile childId to desktop childId
+    if (!isMobile && isMobileChild) {
+      const newChildId = childId.replace('-mobile', '-desktop')
+      urlParams.set('childId', newChildId)
+      window.location.replace(`${window.location.pathname}?${urlParams.toString()}`)
+      return
+    }
+  }, [childId])
   
   if (requestedProjectId) {
+    const scope = childId ? { type: 'child' as const, childId } : { type: 'root' as const }
     return (
       <div className="min-h-screen bg-gray-900">
-        <CanvasApp projectId={requestedProjectId} />
+        <CanvasApp projectId={requestedProjectId} scope={scope} />
       </div>
     )
   }

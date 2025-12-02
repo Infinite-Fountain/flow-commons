@@ -4,18 +4,19 @@ import React, { useMemo, useState } from 'react'
 
 interface BackgroundGradientModalProps {
   open: boolean
-  mode: 'none' | 'linear' | 'radial' | 'solid'
+  mode: 'none' | 'linear' | 'radial' | 'solid' | 'zigzag'
   from: string
   to: string
   onClose: () => void
-  onSave: (background: { mode: 'none' | 'linear' | 'radial' | 'solid'; from: string; to: string }) => void
+  onSave: (background: { mode: 'none' | 'linear' | 'radial' | 'solid' | 'zigzag'; from: string; to: string }) => void
 }
 
 export function BackgroundGradientModal({ open, mode, from, to, onClose, onSave }: BackgroundGradientModalProps) {
-  const [localMode, setLocalMode] = useState<'none' | 'solid' | 'linear' | 'radial'>(mode ?? 'linear')
+  const [localMode, setLocalMode] = useState<'none' | 'solid' | 'linear' | 'radial' | 'zigzag'>(mode ?? 'linear')
   const [localFrom, setLocalFrom] = useState(from)
   const [localTo, setLocalTo] = useState(to)
 
+  // Keep modal in sync when opening with current Firestore values
   React.useEffect(() => {
     if (!open) return
     setLocalMode((mode ?? 'linear') as any)
@@ -27,6 +28,7 @@ export function BackgroundGradientModal({ open, mode, from, to, onClose, onSave 
     if (localMode === 'solid') return localFrom
     if (localMode === 'linear') return `linear-gradient(135deg, ${localFrom}, ${localTo})`
     if (localMode === 'radial') return `radial-gradient(circle, ${localFrom}, ${localTo})`
+    if (localMode === 'zigzag') return `linear-gradient(135deg, ${localFrom}, ${localTo})` // Preview with first gradient direction
     return 'transparent'
   }, [localMode, localFrom, localTo])
 
@@ -45,6 +47,7 @@ export function BackgroundGradientModal({ open, mode, from, to, onClose, onSave 
               <option value="solid">Solid</option>
               <option value="linear">Linear gradient</option>
               <option value="radial">Radial gradient</option>
+              <option value="zigzag">Zigzag gradient</option>
             </select>
           </div>
           <div>
@@ -79,6 +82,7 @@ export function BackgroundGradientModal({ open, mode, from, to, onClose, onSave 
               else if (localMode === 'solid') onSave({ mode: 'solid', from: localFrom, to: localFrom })
               else if (localMode === 'linear') onSave({ mode: 'linear', from: localFrom, to: localTo })
               else if (localMode === 'radial') onSave({ mode: 'radial', from: localFrom, to: localTo })
+              else if (localMode === 'zigzag') onSave({ mode: 'zigzag', from: localFrom, to: localTo })
             }}
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >

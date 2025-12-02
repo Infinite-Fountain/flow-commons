@@ -1,6 +1,7 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/interoperable-canvas/gardens-fund/page": "app/interoperable-canvas/gardens-fund/page.js",
+  "/api/dune/latest/route": "app/api/dune/latest/route.js",
   "/interoperable-canvas/page": "app/interoperable-canvas/page.js",
+  "/interoperable-canvas/gardens-fund/page": "app/interoperable-canvas/gardens-fund/page.js",
   "/page": "app/page.js"
 }

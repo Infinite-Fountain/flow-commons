@@ -813,4 +813,34 @@ function InlineNameEditor({ projectId, canvasId, selectedId, initialName }: { pr
   )
 }
 
+function parseDuneInput(input: string): { queryId?: string; vizId?: string; sourceUrl?: string } {
+  const trimmed = (input || '').trim()
+  if (!trimmed) return {}
+  // If it's a raw numeric id, accept directly
+  if (/^\d+$/.test(trimmed)) {
+    return { queryId: trimmed }
+  }
+  // Try to parse as URL
+  try {
+    const u = new URL(trimmed)
+    const parts = u.pathname.split('/').filter(Boolean)
+    // Look for /queries/<queryId>/<vizId?>
+    const qi = parts.findIndex((p) => p.toLowerCase() === 'queries')
+    if (qi >= 0 && parts[qi + 1]) {
+      const queryId = parts[qi + 1]
+      const vizId = parts[qi + 2]
+      return { queryId, vizId, sourceUrl: trimmed }
+    }
+    // Some links might come as /embeds/<...> – keep original as sourceUrl and try to extract numbers
+    const nums = parts.map((p) => p.match(/^(\d+)$/)?.[1]).filter(Boolean)
+    if (nums.length > 0) {
+      return { queryId: nums[0], vizId: nums[1], sourceUrl: trimmed }
+    }
+    return { sourceUrl: trimmed }
+  } catch {
+    // Not a URL; return as-is
+    return {}
+  }
+}
+
 

@@ -10,7 +10,7 @@ export type GridItem = {
   type: 'chart' | 'image' | 'text' | 'snapshot'
 }
 
-export type OverlayContentType = 'none' | 'text' | 'image' | 'chart' | 'animation' | 'dune'
+export type OverlayContentType = 'none' | 'text' | 'image' | 'chart' | 'animation' | 'dune' | 'kanban'
 
 export type OverlayItem = {
   id: string
@@ -37,10 +37,10 @@ export type Layer = {
 }
 
 export type CanvasState = {
-  aspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app'
-  setAspect: (a: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app') => void
-  background: { mode: 'none' | 'solid' | 'linear' | 'radial'; from: string; to: string }
-  setBackground: (b: { mode: 'none' | 'solid' | 'linear' | 'radial'; from: string; to: string }) => void
+  aspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app' | 'landing-page' | 'mobile-landing-page'
+  setAspect: (a: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app' | 'landing-page' | 'mobile-landing-page') => void
+  background: { mode: 'none' | 'solid' | 'linear' | 'radial' | 'zigzag'; from: string; to: string }
+  setBackground: (b: { mode: 'none' | 'solid' | 'linear' | 'radial' | 'zigzag'; from: string; to: string }) => void
   items: GridItem[]
   overlay: OverlayItem[]
   setOverlay: (items: OverlayItem[]) => void

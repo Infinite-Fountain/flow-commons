@@ -1,16 +1,36 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
+import { useCanvasStore } from './store'
+import { ZigzagGradient } from './ZigzagGradient'
 
 interface CanvasProps {
-  aspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app'
+  aspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app' | 'landing-page' | 'mobile-landing-page'
   backgroundColor: string
+  backgroundMode?: 'none' | 'solid' | 'linear' | 'radial' | 'zigzag'
+  backgroundFrom?: string
+  backgroundTo?: string
   className?: string
   children: React.ReactNode
   presentation?: boolean // when true, hide header simulator
+  fullscreen?: boolean // when true, remove all margins and fill entire viewport
 }
 
-export function Canvas({ aspect, backgroundColor, className = '', children, presentation = false }: CanvasProps) {
+export function Canvas({ aspect, backgroundColor, backgroundMode, backgroundFrom, backgroundTo, className = '', children, presentation = false, fullscreen = false }: CanvasProps) {
+  const overlay = useCanvasStore((s) => s.overlay)
+  const [viewportHeight, setViewportHeight] = useState(() => 
+    typeof window !== 'undefined' ? window.innerHeight : 800
+  )
+  
+  // Update viewport height on window resize
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleResize = () => {
+      setViewportHeight(window.innerHeight)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
   const getAspectRatio = () => {
     switch (aspect) {
       case '1:1': return 'aspect-square'
@@ -19,11 +39,39 @@ export function Canvas({ aspect, backgroundColor, className = '', children, pres
       case '9:16': return 'aspect-[9/16]'
       case '4:6': return 'aspect-[4/6]'
       case 'mini-app': return 'aspect-[9/16]'
+      case 'landing-page': return '' // No aspect ratio constraint for landing-page
+      case 'mobile-landing-page': return '' // No aspect ratio constraint for mobile landing-page
       default: return 'aspect-square'
     }
   }
+  
+  // Calculate dynamic height for landing-page based on box positions
+  const calculatedHeight = useMemo(() => {
+    if (aspect !== 'landing-page' && aspect !== 'mobile-landing-page') return null
+    
+    if (overlay.length === 0) {
+      // If no boxes, use viewport height as minimum
+      return viewportHeight
+    }
+    
+    // Find the bottom-most box (y + h)
+    const bottomMostBox = overlay.reduce((max, box) => {
+      const bottom = box.y + box.h
+      return bottom > max ? bottom : max
+    }, 0)
+    
+    // Add padding (50% of viewport height) to ensure there's always space below
+    const padding = viewportHeight * 0.5
+    const minHeight = viewportHeight
+    
+    return Math.max(minHeight, bottomMostBox + padding)
+  }, [aspect, overlay, viewportHeight])
 
   const getContainerClasses = () => {
+    // For landing-page, use flex container to center canvas
+    if (aspect === 'landing-page' || aspect === 'mobile-landing-page') {
+      return 'w-full flex justify-center'
+    }
     // For horizontal aspect ratios, use full width
     if (aspect === '1:1' || aspect === '16:9' || aspect === '4:3') {
       return 'w-full h-screen flex items-center justify-center'
@@ -33,6 +81,20 @@ export function Canvas({ aspect, backgroundColor, className = '', children, pres
   }
 
   const getCanvasClasses = () => {
+    // In fullscreen mode, remove all margins and use full viewport
+    if (fullscreen) {
+      return `${getAspectRatio()} w-full h-full`
+    }
+    
+    // For landing-page, fixed 1100px in presentation, responsive in edit
+    if (aspect === 'landing-page') {
+      return presentation ? `block mt-[20px] box-border` : `block mt-[20px] box-border w-full max-w-full`
+    }
+    // For mobile-landing-page, fixed 390px in both presentation and edit mode
+    if (aspect === 'mobile-landing-page') {
+      return `block mt-[20px] box-border`
+    }
+    
     // For square, fit to height to maintain square shape on any screen
     if (aspect === '1:1') {
       return `${getAspectRatio()} h-[95%] max-w-full mx-[10px]`
@@ -55,8 +117,11 @@ export function Canvas({ aspect, backgroundColor, className = '', children, pres
         <div className={getCanvasClasses()}>
           <div 
             className="w-full h-full relative overflow-hidden"
-            style={{ background: backgroundColor || 'transparent' }}
+            style={{ background: backgroundColor || 'transparent', position: 'relative' }}
           >
+            {backgroundMode === 'zigzag' && backgroundFrom && backgroundTo && (
+              <ZigzagGradient from={backgroundFrom} to={backgroundTo} />
+            )}
             {/* Header simulator */}
             {!presentation && (
               <div
@@ -93,13 +158,94 @@ export function Canvas({ aspect, backgroundColor, className = '', children, pres
     )
   }
 
+  // Special handling for landing-page with dynamic height
+  if (aspect === 'landing-page') {
+    return (
+      <div className={`${getContainerClasses()} ${className}`}>
+        <div 
+          className={getCanvasClasses()}
+          style={{ 
+            minHeight: calculatedHeight || '100vh',
+            height: calculatedHeight ? `${calculatedHeight}px` : 'auto',
+            width: presentation ? '1100px' : '100%',
+            maxWidth: presentation ? '1100px' : '100%',
+            boxSizing: 'border-box',
+            border: 'none'
+          }}
+        >
+          <div 
+            className="w-full relative mx-auto"
+            style={{ 
+              background: backgroundColor || 'transparent',
+              minHeight: calculatedHeight || '100vh',
+              height: calculatedHeight ? `${calculatedHeight}px` : 'auto',
+              width: presentation ? '1100px' : '100%',
+              maxWidth: presentation ? '1100px' : '100%',
+              boxSizing: 'border-box',
+              border: 'none',
+              zIndex: presentation ? 1 : 'auto',
+              position: 'relative'
+            }}
+          >
+            {backgroundMode === 'zigzag' && backgroundFrom && backgroundTo && (
+              <ZigzagGradient from={backgroundFrom} to={backgroundTo} />
+            )}
+            {children}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Special handling for mobile-landing-page with dynamic height (390px width)
+  if (aspect === 'mobile-landing-page') {
+    return (
+      <div className={`${getContainerClasses()} ${className}`}>
+        <div 
+          className={getCanvasClasses()}
+          style={{ 
+            minHeight: calculatedHeight || '100vh',
+            height: calculatedHeight ? `${calculatedHeight}px` : 'auto',
+            width: '390px',
+            maxWidth: '390px',
+            boxSizing: 'border-box',
+            border: 'none'
+          }}
+        >
+          <div 
+            className="w-full relative mx-auto"
+            style={{ 
+              background: backgroundColor || 'transparent',
+              minHeight: calculatedHeight || '100vh',
+              height: calculatedHeight ? `${calculatedHeight}px` : 'auto',
+              width: '390px',
+              maxWidth: '390px',
+              boxSizing: 'border-box',
+              border: 'none',
+              zIndex: presentation ? 1 : 'auto',
+              position: 'relative'
+            }}
+          >
+            {backgroundMode === 'zigzag' && backgroundFrom && backgroundTo && (
+              <ZigzagGradient from={backgroundFrom} to={backgroundTo} />
+            )}
+            {children}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`${getContainerClasses()} ${className}`}>
       <div className={getCanvasClasses()}>
         <div 
           className="w-full h-full relative overflow-hidden"
-          style={{ background: backgroundColor || 'transparent' }}
+          style={{ background: backgroundColor || 'transparent', position: 'relative' }}
         >
+          {backgroundMode === 'zigzag' && backgroundFrom && backgroundTo && (
+            <ZigzagGradient from={backgroundFrom} to={backgroundTo} />
+          )}
           {children}
         </div>
       </div>

@@ -21,7 +21,7 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig as an
 const db = getFirestore(app)
 const storage = getStorage(app)
 
-export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope = { type: 'root' } as { type: 'root' } | { type: 'child'; childId: string } }: { projectId?: string; canvasId?: string; scope?: { type: 'root' } | { type: 'child'; childId: string } }) {
+export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope = { type: 'root' } as { type: 'root' } | { type: 'child'; childId: string }, presentation = false, isAuthorized = false }: { projectId?: string; canvasId?: string; scope?: { type: 'root' } | { type: 'child'; childId: string }; presentation?: boolean; isAuthorized?: boolean }) {
   const overlay = useCanvasStore((s) => s.overlay)
   const setOverlay = useCanvasStore((s) => s.setOverlay)
   const updateOverlay = useCanvasStore((s) => s.updateOverlay)
@@ -45,7 +45,7 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
   }, [layers])
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (currentTool !== 'add-box') return
+    if (presentation || !isAuthorized || currentTool !== 'add-box') return
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect) return
     const x = e.clientX - rect.left
@@ -55,7 +55,7 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (currentTool !== 'add-box' || !dragStart) return
+    if (presentation || !isAuthorized || currentTool !== 'add-box' || !dragStart) return
     const rect = containerRef.current?.getBoundingClientRect()
     if (!rect) return
     const cx = e.clientX - rect.left
@@ -68,7 +68,7 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
   }
 
   const onPointerUp = () => {
-    if (currentTool !== 'add-box' || !dragStart || !draftRect) return
+    if (presentation || !isAuthorized || currentTool !== 'add-box' || !dragStart || !draftRect) return
     const minSize = 40
     const w = Math.max(minSize, draftRect.w)
     const h = Math.max(minSize, draftRect.h)
@@ -149,19 +149,22 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      {overlay.map((it) => (
+      {/* Only render boxes if authorized or in presentation mode */}
+      {(isAuthorized || presentation) && overlay.map((it) => (
         <Rnd
           key={it.id}
           size={{ width: it.w, height: it.h }}
           position={{ x: it.x, y: it.y }}
-          onDragStop={(_, d) => {
+          disableDragging={presentation || !isAuthorized}
+          disableResizing={presentation || !isAuthorized}
+          onDragStop={presentation || !isAuthorized ? undefined : (_, d) => {
             const nx = Math.round(d.x)
             const ny = Math.round(d.y)
             updateOverlay(it.id, { x: nx, y: ny })
             const itemRef = doc(db, pathForCanvasDoc().concat(['overlay', it.id]).join('/'))
             setDoc(itemRef, { x: nx, y: ny }, { merge: true })
           }}
-          onResizeStop={(_, __, ref, ___, position) => {
+          onResizeStop={presentation || !isAuthorized ? undefined : (_, __, ref, ___, position) => {
             const nw = Math.round(ref.offsetWidth)
             const nh = Math.round(ref.offsetHeight)
             const nx = Math.round(position.x)
@@ -172,7 +175,7 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
           }}
           bounds="parent"
           style={{
-            border: it.id === selectedId ? '2px solid #ffcf33' : '1px solid rgba(255,255,255,0.25)',
+            border: presentation ? 'none' : (it.id === selectedId ? '2px solid #ffcf33' : 'none'),
             background: (() => {
               const bg = (it as any).background
               if (!bg || bg.mode === 'none') return 'transparent'
@@ -185,8 +188,8 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
             overflow: 'hidden',
             zIndex: idToZ[it.id] ?? 1,
           }}
-          onClick={() => setSelectedId(it.id)}
-          onDoubleClick={() => openBoxModal(it.id)}
+          onClick={presentation || !isAuthorized ? undefined : () => setSelectedId(it.id)}
+          onDoubleClick={presentation || !isAuthorized ? undefined : () => openBoxModal(it.id)}
         >
           <div className="w-full h-full">
             {it.contentType === 'text' && (

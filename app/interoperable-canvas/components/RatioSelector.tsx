@@ -4,13 +4,13 @@ import React from 'react'
 import { useCanvasStore } from './store'
 
 interface RatioSelectorProps {
-  onAspectChange?: (aspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app') => void
+  onAspectChange?: (aspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app' | 'landing-page' | 'mobile-landing-page') => void
 }
 
 export function RatioSelector({ onAspectChange }: RatioSelectorProps) {
   const { aspect, setAspect } = useCanvasStore()
 
-  const handleChange = (newAspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app') => {
+  const handleChange = (newAspect: '1:1' | '16:9' | '4:3' | '9:16' | '4:6' | 'mini-app' | 'landing-page' | 'mobile-landing-page') => {
     setAspect(newAspect)
     onAspectChange?.(newAspect)
   }
@@ -29,6 +29,8 @@ export function RatioSelector({ onAspectChange }: RatioSelectorProps) {
         <option value="4:6">4:6 (Vertical Post)</option>
         <option value="9:16">9:16 (Vertical Stories)</option>
         <option value="mini-app">Mini App (9:16 safe)</option>
+        <option value="landing-page">Desktop Landing (Infinite Height)</option>
+        <option value="mobile-landing-page">Mobile Landing (Infinite Height)</option>
       </select>
     </div>
   )
