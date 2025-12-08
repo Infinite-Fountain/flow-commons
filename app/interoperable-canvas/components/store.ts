@@ -10,7 +10,7 @@ export type GridItem = {
   type: 'chart' | 'image' | 'text' | 'snapshot'
 }
 
-export type OverlayContentType = 'none' | 'text' | 'image' | 'chart' | 'animation' | 'dune' | 'kanban'
+export type OverlayContentType = 'none' | 'text' | 'image' | 'chart' | 'animation' | 'dune' | 'kanban' | 'snapshot'
 
 export type OverlayItem = {
   id: string
@@ -28,6 +28,9 @@ export type OverlayItem = {
   color?: string
   bold?: boolean
   align?: 'left' | 'center' | 'right'
+  clickable?: boolean // If true, box is clickable
+  url?: string // URL to navigate to when clicked (required if clickable=true)
+  openIn?: 'new-tab' | 'same-tab' // How to open the link (default: 'new-tab')
 }
 
 export type Layer = {

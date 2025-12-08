@@ -7,6 +7,7 @@ import { useCanvasStore } from './store'
 import { initializeApp, getApps } from 'firebase/app'
 import { getFirestore, collection, doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { getStorage, ref as storageRef, getBytes } from 'firebase/storage'
+import { SnapshotVoteBox } from './SnapshotVoteBox'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -103,6 +104,7 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
   }
 
   // Firestore live sync for overlay items
+  // NOTE: Only updates overlay items, NOT layer order. Layer order is controlled by Firestore layers array.
   useEffect(() => {
     if (!projectId) return
     const col = collection(db, pathForCanvasDoc().concat(['overlay']).join('/'))
@@ -110,32 +112,8 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
       const items: any[] = []
       snap.forEach((d) => items.push(d.data()))
       setOverlay(items as any)
-      // Build quick lookup for overlay names
-      const nameById: Record<string, string> = {}
-      items.forEach((it: any) => { if (it?.id) nameById[it.id] = it.name || it.id })
-
-      // Ensure layers include all overlay ids and keep names in sync
-      const existingById: Record<string, any> = {}
-      layers.forEach((l) => { existingById[l.id] = l })
-      const next: any[] = []
-      // Always include background at z 0
-      next.push({ id: 'background', name: 'Background', z: 0 })
-      // Add existing non-background layers in current order, updating names from overlay
-      layers.filter((l) => l.id !== 'background').forEach((l) => {
-        const updatedName = nameById[l.id] ?? l.name ?? l.id
-        next.push({ ...l, name: updatedName })
-      })
-      // Append any overlay items missing from layers
-      items.forEach((it) => {
-        if (!existingById[it.id]) {
-          next.push({ id: it.id, name: nameById[it.id] ?? it.id, z: next.length })
-        }
-      })
-      // Recompute z indices by creating new objects
-      const nextWithZ = next.map((l, i) => ({ ...l, z: i }))
-      // Only update if changed to avoid loops
-      const changed = nextWithZ.length !== layers.length || nextWithZ.some((l, i) => layers[i]?.id !== l.id || layers[i]?.name !== l.name)
-      if (changed) setLayers(nextWithZ as any)
+      // Do NOT rebuild layers here - layer order is controlled by Firestore layers array
+      // Layer order should only change when manually moved via LayersModal up/down arrows
     })
     return () => unsub()
   }, [projectId, canvasId, (scope as any)?.type === 'child' ? (scope as any).childId : 'root', setOverlay])
@@ -143,8 +121,10 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
   return (
     <div
       ref={containerRef}
-      className="w-full h-full absolute inset-0"
-      style={{ zIndex: 1 }}
+      className="absolute inset-0 w-full h-full"
+      style={{
+        zIndex: 1,
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -187,8 +167,56 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
             borderRadius: 8,
             overflow: 'hidden',
             zIndex: idToZ[it.id] ?? 1,
+            cursor: (presentation && (it as any)?.clickable) ? 'pointer' : undefined,
           }}
-          onClick={presentation || !isAuthorized ? undefined : () => setSelectedId(it.id)}
+          onClick={(e: React.MouseEvent) => {
+            // Skip handling clicks for snapshot boxes - they have their own overlay
+            if (it.contentType === 'snapshot' && presentation && (it as any)?.clickable) {
+              return
+            }
+            
+            // In presentation mode, handle clickable boxes
+            if (presentation && (it as any)?.clickable && (it as any)?.url) {
+              e.stopPropagation()
+              const url = (it as any).url
+              const openIn = (it as any)?.openIn ?? 'new-tab'
+              
+              // Detect if external link (basic detection)
+              const isExternal = (() => {
+                try {
+                  const parsed = new URL(url)
+                  if (typeof window !== 'undefined') {
+                    return parsed.origin !== window.location.origin
+                  }
+                  // If we can't determine, assume external for safety
+                  return true
+                } catch {
+                  // Invalid URL, don't navigate
+                  return false
+                }
+              })()
+              
+              if (openIn === 'new-tab') {
+                // Open in new tab with security attributes for external links
+                const link = document.createElement('a')
+                link.href = url
+                link.target = '_blank'
+                if (isExternal) {
+                  link.rel = 'noopener noreferrer'
+                }
+                link.click()
+              } else {
+                // Open in same tab
+                window.location.href = url
+              }
+              return
+            }
+            
+            // In edit mode, select box (existing behavior)
+            if (!presentation && isAuthorized) {
+              setSelectedId(it.id)
+            }
+          }}
           onDoubleClick={presentation || !isAuthorized ? undefined : () => openBoxModal(it.id)}
         >
           <div className="w-full h-full">
@@ -200,35 +228,68 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
                 align={(it as any).text?.align ?? 'left'}
                 fitToWidth={!!(it as any).text?.fitToWidth}
                 baseFontSize={(it as any).text?.fontSize ?? 18}
+                opacity={(it as any).text?.opacity !== undefined ? (it as any).text.opacity : 100}
               />
             )}
             {it.contentType === 'image' && (it as any).imageSrc && (
               <img
                 src={(it as any).imageSrc}
+                srcSet={(it as any).imageSrcset || undefined}
                 alt=""
                 style={{
                   width: '100%',
                   height: '100%',
                   objectFit: ((it as any).imageBehavior ?? 'contain') as 'contain' | 'cover',
                   objectPosition: 'center',
+                  opacity: ((it as any).imageOpacity !== undefined ? (it as any).imageOpacity : 100) / 100,
                 }}
               />
             )}
-            {it.contentType === 'animation' && (it as any).lottieSrc && (
-              <LottieAnimationRenderer
-                lottieSrc={(it as any).lottieSrc}
-                loop={(it as any).loop ?? true}
-                autoplay={(it as any).autoplay ?? true}
-              />
+            {it.contentType === 'animation' && (
+              (it as any).animationType === 'url' || (it as any).animationUrl
+                ? <EmbeddedAnimationRenderer animationUrl={(it as any).animationUrl} />
+                : (it as any).lottieSrc
+                  ? (
+                    <LottieAnimationRenderer
+                      lottieSrc={(it as any).lottieSrc}
+                      loop={(it as any).loop ?? true}
+                      autoplay={(it as any).autoplay ?? true}
+                    />
+                  )
+                  : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100 text-xs text-gray-500">
+                      Add a Lottie file or URL in the box settings.
+                    </div>
+                  )
             )}
             {it.contentType === 'dune' && (
               <DuneBoxPlaceholder dune={(it as any).dune} />
+            )}
+            {it.contentType === 'kanban' && (
+              <KanbanBoxPlaceholder kanban={(it as any).kanban} />
+            )}
+            {it.contentType === 'snapshot' && (it as any).snapshotProposalId && (
+              <SnapshotVoteBox
+                proposalId={(it as any).snapshotProposalId}
+                backgroundColor={(it as any).backgroundColor ?? '#ffffff'}
+                border={(it as any).border !== undefined ? (it as any).border : true}
+                borderColor={(it as any).borderColor ?? '#000000'}
+                borderWidth={(it as any).borderWidth ?? 1}
+                projectId={projectId}
+                canvasId={canvasId}
+                scope={scope}
+                clickable={(it as any)?.clickable ?? false}
+                url={(it as any)?.url}
+                openIn={(it as any)?.openIn ?? 'new-tab'}
+                presentation={presentation}
+              />
             )}
           </div>
         </Rnd>
       ))}
 
-      {currentTool === 'add-box' && draftRect && (
+      {/* Only show draft rect if authorized */}
+      {isAuthorized && currentTool === 'add-box' && draftRect && (
         <div
           className="absolute border-2 border-blue-400/70 bg-blue-400/10"
           style={{ left: draftRect.x, top: draftRect.y, width: draftRect.w, height: draftRect.h, pointerEvents: 'none' }}
@@ -245,6 +306,7 @@ function AutoFitText({
   align,
   fitToWidth,
   baseFontSize,
+  opacity = 100,
 }: {
   text: string
   color: string
@@ -252,6 +314,7 @@ function AutoFitText({
   align: 'left' | 'center' | 'right'
   fitToWidth: boolean
   baseFontSize: number
+  opacity?: number
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
   const [fontSize, setFontSize] = useState<number>(baseFontSize)
@@ -324,6 +387,7 @@ function AutoFitText({
         wordWrap: 'break-word',
         overflowWrap: 'break-word',
         whiteSpace: 'normal', // Allow wrapping
+        opacity: opacity / 100, // Convert 0-100 to 0-1 for CSS
       }}
     >
       {text}
@@ -592,6 +656,231 @@ function DuneBoxPlaceholder({ dune }: { dune?: any }) {
   return (
     <div className="w-full h-full relative" style={{ background: 'white' }}>
       <canvas ref={chartRef} className="absolute inset-0 w-full h-full" />
+    </div>
+  )
+}
+
+function EmbeddedAnimationRenderer({ animationUrl }: { animationUrl?: string }) {
+  const [isLoaded, setIsLoaded] = useState(false)
+  const safeUrl = useMemo(() => {
+    if (!animationUrl) return ''
+    try {
+      const parsed = new URL(animationUrl)
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed.toString()
+      }
+      return ''
+    } catch {
+      return ''
+    }
+  }, [animationUrl])
+
+  useEffect(() => {
+    setIsLoaded(false)
+  }, [safeUrl])
+
+  if (!animationUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 text-xs text-gray-500">
+        No animation URL provided.
+      </div>
+    )
+  }
+
+  if (!safeUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 text-xs text-gray-500 px-2 text-center">
+        Invalid animation URL. Update the box settings to use http(s) links.
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full h-full relative flex items-center justify-center bg-black/30 overflow-hidden">
+      {!isLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-200">
+          Loading animation…
+        </div>
+      )}
+      <iframe
+        title="Embedded animation"
+        src={safeUrl}
+        style={{ width: '100%', height: '100%', border: 'none', pointerEvents: 'none', display: 'block' }}
+        allow="autoplay; fullscreen; clipboard-read; clipboard-write"
+        allowFullScreen
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+        scrolling="no"
+        onLoad={() => setIsLoaded(true)}
+      />
+    </div>
+  )
+}
+
+function KanbanBoxPlaceholder({ kanban }: { kanban?: any }) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [currentUrl, setCurrentUrl] = useState<string>('')
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const triedFallbackRef = useRef(false)
+  const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+
+  useEffect(() => {
+    if (!kanban?.embedUrl && !kanban?.sourceUrl) {
+      setLoading(false)
+      setError('No kanban board URL configured')
+      return
+    }
+
+    // Reset state when URL changes
+    setLoading(true)
+    setError(null)
+    triedFallbackRef.current = false
+
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+
+    // On localhost, try sourceUrl first (original format) as embed URLs are often blocked
+    // On production, try embedUrl first for cleaner embedding
+    const urlToUse = isLocalhost 
+      ? (kanban?.sourceUrl || kanban?.embedUrl)
+      : (kanban?.embedUrl || kanban?.sourceUrl)
+    setCurrentUrl(urlToUse)
+
+    // Set a shorter timeout for localhost since we know it will likely fail
+    const timeoutDuration = isLocalhost ? 5000 : 15000
+    timeoutRef.current = setTimeout(() => {
+      setLoading((prevLoading) => {
+        if (prevLoading && !triedFallbackRef.current) {
+          // Try fallback URL if we haven't already
+          if (isLocalhost && kanban?.embedUrl && urlToUse === kanban?.sourceUrl) {
+            // On localhost, if sourceUrl didn't work, try embedUrl (though it likely won't work either)
+            triedFallbackRef.current = true
+            setCurrentUrl(kanban.embedUrl)
+            if (iframeRef.current) {
+              iframeRef.current.src = kanban.embedUrl
+            }
+            return true
+          } else if (!isLocalhost && kanban?.sourceUrl && urlToUse === kanban?.embedUrl) {
+            // On production, if embedUrl didn't work, try sourceUrl
+            triedFallbackRef.current = true
+            setCurrentUrl(kanban.sourceUrl)
+            if (iframeRef.current) {
+              iframeRef.current.src = kanban.sourceUrl
+            }
+            return true
+          } else {
+            // No fallback available or already tried
+            if (isLocalhost) {
+              setError('Notion embeds are blocked on localhost due to security restrictions. This will work when deployed to production (Vercel, Netlify, etc.).')
+            } else {
+              setError('Board is taking too long to load. The board may not be published to the web, or there may be a connection issue.')
+            }
+            return false
+          }
+        } else if (prevLoading) {
+          if (isLocalhost) {
+            setError('Notion embeds are blocked on localhost due to security restrictions. This will work when deployed to production (Vercel, Netlify, etc.).')
+          } else {
+            setError('Board is taking too long to load. The board may not be published to the web, or there may be a connection issue.')
+          }
+          return false
+        }
+        return prevLoading
+      })
+    }, timeoutDuration)
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [kanban?.embedUrl, kanban?.sourceUrl, isLocalhost])
+
+  const handleIframeLoad = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    setLoading(false)
+    setError(null)
+  }
+
+  const handleIframeError = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    setLoading(false)
+    setError('Failed to load kanban board. Make sure your Notion board is published to the web.')
+  }
+
+  const handleRetry = () => {
+    setLoading(true)
+    setError(null)
+    if (iframeRef.current) {
+      // Force reload by appending timestamp
+      const url = new URL(iframeRef.current.src)
+      url.searchParams.set('_reload', Date.now().toString())
+      iframeRef.current.src = url.toString()
+    }
+  }
+
+  if (!currentUrl && !kanban?.embedUrl && !kanban?.sourceUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-900/40 text-gray-200 text-xs px-2">
+        <div className="text-center">
+          <div className="font-semibold mb-1">No kanban board configured</div>
+          <div>Add a Notion kanban board URL in the box settings.</div>
+        </div>
+      </div>
+    )
+  }
+
+  const urlToDisplay = currentUrl || kanban?.embedUrl || kanban?.sourceUrl
+
+  return (
+    <div className="w-full h-full relative bg-white">
+      {/* Show iframe immediately - let it load naturally */}
+      <iframe
+        ref={iframeRef}
+        src={urlToDisplay}
+        title="Notion Kanban Board"
+        className="w-full h-full border-0"
+        onLoad={handleIframeLoad}
+        onError={handleIframeError}
+        allow="clipboard-read; clipboard-write; fullscreen"
+        // Removed sandbox restrictions for Notion embeds - they need full access to work properly
+      />
+      {/* Loading overlay - fades away when loaded or after timeout */}
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10 transition-opacity duration-300">
+          <div className="text-center">
+            <div className="text-sm text-gray-600 mb-2">Loading Notion board...</div>
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          </div>
+        </div>
+      )}
+      {/* Error overlay */}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-20">
+          <div className="text-center px-4 max-w-md">
+            <div className="text-sm font-semibold text-red-600 mb-2">Error loading board</div>
+            <div className="text-xs text-gray-600 mb-3">{error}</div>
+            {isLocalhost && (
+              <div className="text-xs text-blue-600 mb-3 p-2 bg-blue-50 rounded">
+                💡 Tip: Notion embeds work on deployed sites. Try deploying to Vercel or Netlify to test the kanban board.
+              </div>
+            )}
+            <button
+              onClick={handleRetry}
+              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

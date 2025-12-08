@@ -21,12 +21,16 @@ export function Canvas({ aspect, backgroundColor, backgroundMode, backgroundFrom
   const [viewportHeight, setViewportHeight] = useState(() => 
     typeof window !== 'undefined' ? window.innerHeight : 800
   )
+  const [viewportWidth, setViewportWidth] = useState(() => 
+    typeof window !== 'undefined' ? window.innerWidth : 1920
+  )
   
-  // Update viewport height on window resize
+  // Update viewport dimensions on window resize
   useEffect(() => {
     if (typeof window === 'undefined') return
     const handleResize = () => {
       setViewportHeight(window.innerHeight)
+      setViewportWidth(window.innerWidth)
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -160,17 +164,29 @@ export function Canvas({ aspect, backgroundColor, backgroundMode, backgroundFrom
 
   // Special handling for landing-page with dynamic height
   if (aspect === 'landing-page') {
+    // Calculate responsive width for presentation mode
+    // Desktop/Tablet: 1100px fixed, Mobile (≤768px): scale to fit viewport width
+    const isMobile = presentation && viewportWidth <= 768
+    const presentationWidth = presentation && !isMobile ? '1100px' : '100%'
+    const scale = isMobile ? viewportWidth / 1100 : 1
+    const scaledHeight = isMobile && calculatedHeight ? calculatedHeight * scale : calculatedHeight
+    
     return (
-      <div className={`${getContainerClasses()} ${className}`}>
+      <div 
+        className={isMobile ? `w-full ${className}` : `${getContainerClasses()} ${className}`} 
+        style={isMobile ? { width: '100vw', overflowX: 'hidden', display: 'block' } : {}}
+      >
         <div 
           className={getCanvasClasses()}
           style={{ 
-            minHeight: calculatedHeight || '100vh',
-            height: calculatedHeight ? `${calculatedHeight}px` : 'auto',
-            width: presentation ? '1100px' : '100%',
-            maxWidth: presentation ? '1100px' : '100%',
+            minHeight: scaledHeight || '100vh',
+            height: scaledHeight ? `${scaledHeight}px` : 'auto',
+            width: presentation ? (isMobile ? `${viewportWidth}px` : presentationWidth) : '100%',
+            maxWidth: presentation ? (isMobile ? `${viewportWidth}px` : presentationWidth) : '100%',
             boxSizing: 'border-box',
-            border: 'none'
+            border: 'none',
+            overflow: isMobile ? 'visible' : 'hidden',
+            margin: isMobile ? '0' : undefined
           }}
         >
           <div 
@@ -179,12 +195,14 @@ export function Canvas({ aspect, backgroundColor, backgroundMode, backgroundFrom
               background: backgroundColor || 'transparent',
               minHeight: calculatedHeight || '100vh',
               height: calculatedHeight ? `${calculatedHeight}px` : 'auto',
-              width: presentation ? '1100px' : '100%',
-              maxWidth: presentation ? '1100px' : '100%',
+              width: '1100px',
+              maxWidth: '1100px',
               boxSizing: 'border-box',
               border: 'none',
               zIndex: presentation ? 1 : 'auto',
-              position: 'relative'
+              position: 'relative',
+              transform: isMobile ? `scale(${scale})` : 'none',
+              transformOrigin: 'top left'
             }}
           >
             {backgroundMode === 'zigzag' && backgroundFrom && backgroundTo && (

@@ -122,13 +122,27 @@ export function CanvasApp({ projectId, scope: initialScope = { type: 'root' }, c
         const items: Array<{ id: string; name?: string; nameKey?: string }> = []
         snap.forEach((d) => items.push({ id: d.id, ...(d.data() as any) }))
         
+        // SAFEGUARD: If we have existing layers but no overlay items found, don't overwrite
+        // This prevents accidentally clearing the layers array due to query failures or timing issues
+        if (existingLayers.length > 1 && items.length === 0) {
+          console.warn('[CanvasApp] rebuildLayersFromOverlay: Found existing layers but no overlay items. Preserving existing layers to prevent data loss.')
+          setLayers(existingLayers.map((id, idx) => ({ id, name: id === 'background' ? 'Background' : id, z: idx })))
+          setTimeout(() => { isSyncingFromFirestoreRef.current = false }, 100)
+          return
+        }
+        
         // If we have an existing layers array with valid order, use it to preserve order
         // Otherwise, if we have zIndexMap, use that
         // Otherwise, fall back to alphabetical sorting for new canvases
         let sorted: Array<{ id: string; name?: string; nameKey?: string }>
+        
+        // Create set of valid item IDs from overlay collection
+        const validItemIds = new Set(items.map(it => it.id))
+        
         if (existingLayers.length > 1) {
           // Use existing layers array order (most reliable)
-          const existingIds = existingLayers.filter(id => id !== 'background')
+          // Filter out any IDs that no longer exist in overlay
+          const existingIds = existingLayers.filter(id => id !== 'background' && validItemIds.has(id))
           const existingItems = existingIds
             .map(id => items.find(it => it.id === id))
             .filter((it): it is { id: string; name?: string; nameKey?: string } => !!it)
@@ -140,9 +154,11 @@ export function CanvasApp({ projectId, scope: initialScope = { type: 'root' }, c
           })]
         } else if (existingZIndexMap && Object.keys(existingZIndexMap).length > 0) {
           // Fall back to zIndexMap if layers array doesn't exist
-          const existingIds = Object.keys(existingZIndexMap).sort((a, b) => (existingZIndexMap[a] ?? 999) - (existingZIndexMap[b] ?? 999))
+          // Filter out any IDs that no longer exist in overlay
+          const existingIds = Object.keys(existingZIndexMap)
+            .filter(id => id !== 'background' && validItemIds.has(id))
+            .sort((a, b) => (existingZIndexMap[a] ?? 999) - (existingZIndexMap[b] ?? 999))
           const existingItems = existingIds
-            .filter(id => id !== 'background')
             .map(id => items.find(it => it.id === id))
             .filter((it): it is { id: string; name?: string; nameKey?: string } => !!it)
           const newItems = items.filter(it => !existingZIndexMap[it.id] && it.id !== 'background')
