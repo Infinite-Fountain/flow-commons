@@ -9,6 +9,8 @@ import { useCanvasStore } from '@/app/interoperable-canvas/components/store'
 import { BackgroundGradientModal } from './BackgroundGradientModal'
 import LayersModal from '@/app/interoperable-canvas/components/LayersModal'
 import BoxContentModal from '@/app/interoperable-canvas/components/BoxContentModal'
+import GardensReportModal from '@/app/interoperable-canvas/components/GardensReportModal'
+import GardensReportOverlayModal from '@/app/interoperable-canvas/components/GardensReportOverlayModal'
 import ConnectWalletButton from './ConnectWalletButton'
 
 import { initializeApp, getApps } from 'firebase/app'
@@ -318,7 +320,6 @@ export function CanvasApp({ projectId, scope: initialScope = { type: 'root' }, c
           <ConnectWalletButton />
           <div className={canEdit ? '' : 'opacity-50 pointer-events-none'}>
             <Toolbar />
-            <RatioSelector onAspectChange={persistAspect} />
             {/* Scope selector for root vs child group */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-300">Canvas Scope</label>
@@ -338,6 +339,27 @@ export function CanvasApp({ projectId, scope: initialScope = { type: 'root' }, c
                 ))}
               </select>
             </div>
+            <RatioSelector onAspectChange={persistAspect} />
+            <button
+              className="w-full px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => {
+                if (!projectId) return
+                // Build URL using slug system: /{projectId}/?childId={childId}&presentation=true&fullscreen=true
+                const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+                const url = new URL(`/${projectId}`, baseUrl)
+                // Get childId from scope or URL params and set it first
+                const currentChildId = scope.type === 'child' ? scope.childId : (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('childId') : null)
+                if (currentChildId) {
+                  url.searchParams.set('childId', currentChildId)
+                }
+                url.searchParams.set('presentation', 'true')
+                url.searchParams.set('fullscreen', 'true')
+                window.open(url.toString(), '_blank')
+              }}
+              disabled={!projectId}
+            >
+              View Site
+            </button>
             {/* Create child canvas */}
             <button
               className="w-full px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -408,6 +430,9 @@ export function CanvasApp({ projectId, scope: initialScope = { type: 'root' }, c
       <LayersModal open={ui.showLayersModal} onClose={() => closeLayers()} projectId={projectId ?? 'demo'} canvasId={canvasId} scope={scope} />
       {/* @ts-ignore add scope prop */}
       <BoxContentModal projectId={projectId ?? 'demo'} canvasId={canvasId} scope={scope} />
+      {/* @ts-ignore add scope prop */}
+      <GardensReportModal projectId={projectId ?? 'demo'} canvasId={canvasId} scope={scope} />
+      <GardensReportOverlayModal />
     </div>
   )
 }

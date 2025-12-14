@@ -32,6 +32,37 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
   const currentTool = useCanvasStore((s) => s.ui.currentTool)
   const setTool = useCanvasStore((s) => s.setTool)
   const openBoxModal = useCanvasStore((s) => s.openBoxModal)
+  const openGardensReportModal = useCanvasStore((s) => s.openGardensReportModal)
+  const openGardensReportOverlayModal = useCanvasStore((s) => s.openGardensReportOverlayModal)
+
+  // Helper function to check if a box is a gardens-report box
+  const isGardensReportBox = (boxId: string, item: any): boolean => {
+    // Check by ID prefix
+    if (boxId.startsWith('gardens-report_') || boxId.startsWith('gardens-report-')) {
+      return true
+    }
+    // Also check by image source path (for existing boxes that might not have the prefix)
+    if (item?.contentType === 'image' && item?.imageSrc && typeof item.imageSrc === 'string') {
+      return item.imageSrc.includes('/gardens-reports/')
+    }
+    // Fallback: check by name
+    if (item?.name && typeof item.name === 'string' && item.name.toLowerCase().includes('gardens report')) {
+      return true
+    }
+    return false
+  }
+
+  // Helper function to check if a box is a gardens-report overlay box
+  const isGardensReportOverlayBox = (boxId: string, item: any): boolean => {
+    // Overlay boxes have _overlay_ in their ID and belong to a gardens-report
+    if (!boxId.includes('_overlay_')) {
+      return false
+    }
+    // Extract the parent box ID (everything before _overlay_)
+    const parentBoxId = boxId.split('_overlay_')[0]
+    // Check if parent ID starts with gardens-report prefix
+    return parentBoxId.startsWith('gardens-report_') || parentBoxId.startsWith('gardens-report-')
+  }
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null)
@@ -130,21 +161,28 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
       onPointerUp={onPointerUp}
     >
       {/* Only render boxes if authorized or in presentation mode */}
-      {(isAuthorized || presentation) && overlay.map((it) => (
+      {(isAuthorized || presentation) && overlay.map((it) => {
+        const isGardensReport = isGardensReportBox(it.id, it)
+        const isOverlay = isGardensReportOverlayBox(it.id, it)
+        // Disable resize/drag for gardens-report boxes (both PNG and overlays)
+        const disableDrag = presentation || !isAuthorized || isGardensReport
+        const disableResize = presentation || !isAuthorized || isGardensReport
+        
+        return (
         <Rnd
           key={it.id}
           size={{ width: it.w, height: it.h }}
           position={{ x: it.x, y: it.y }}
-          disableDragging={presentation || !isAuthorized}
-          disableResizing={presentation || !isAuthorized}
-          onDragStop={presentation || !isAuthorized ? undefined : (_, d) => {
+          disableDragging={disableDrag}
+          disableResizing={disableResize}
+          onDragStop={disableDrag ? undefined : (_, d) => {
             const nx = Math.round(d.x)
             const ny = Math.round(d.y)
             updateOverlay(it.id, { x: nx, y: ny })
             const itemRef = doc(db, pathForCanvasDoc().concat(['overlay', it.id]).join('/'))
             setDoc(itemRef, { x: nx, y: ny }, { merge: true })
           }}
-          onResizeStop={presentation || !isAuthorized ? undefined : (_, __, ref, ___, position) => {
+          onResizeStop={disableResize ? undefined : (_, __, ref, ___, position) => {
             const nw = Math.round(ref.offsetWidth)
             const nh = Math.round(ref.offsetHeight)
             const nx = Math.round(position.x)
@@ -217,7 +255,16 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
               setSelectedId(it.id)
             }
           }}
-          onDoubleClick={presentation || !isAuthorized ? undefined : () => openBoxModal(it.id)}
+          onDoubleClick={presentation || !isAuthorized ? undefined : () => {
+            // Open appropriate modal based on box type
+            if (isOverlay) {
+              openGardensReportOverlayModal(it.id)
+            } else if (isGardensReport) {
+              openGardensReportModal(it.id)
+            } else {
+              openBoxModal(it.id)
+            }
+          }}
         >
           <div className="w-full h-full">
             {it.contentType === 'text' && (
@@ -286,7 +333,8 @@ export function FreeformOverlay({ projectId = 'demo', canvasId = 'root', scope =
             )}
           </div>
         </Rnd>
-      ))}
+        )
+      })}
 
       {/* Only show draft rect if authorized */}
       {isAuthorized && currentTool === 'add-box' && draftRect && (

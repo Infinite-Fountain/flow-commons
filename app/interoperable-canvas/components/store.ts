@@ -48,7 +48,7 @@ export type CanvasState = {
   overlay: OverlayItem[]
   setOverlay: (items: OverlayItem[]) => void
   layers: Layer[]
-  ui: { showBackgroundModal: boolean; showLayersModal: boolean; showBoxModal: boolean; currentTool: 'none' | 'add-box' }
+  ui: { showBackgroundModal: boolean; showLayersModal: boolean; showBoxModal: boolean; showGardensReportModal: boolean; showGardensReportOverlayModal: boolean; currentTool: 'none' | 'add-box' }
   selectedId: string | null
   addItem: (item: GridItem) => void
   updateItem: (id: string, partial: Partial<GridItem>) => void
@@ -67,6 +67,10 @@ export type CanvasState = {
   setSelectedId: (id: string | null) => void
   openBoxModal: (id: string) => void
   closeBoxModal: () => void
+  openGardensReportModal: (id: string) => void
+  closeGardensReportModal: () => void
+  openGardensReportOverlayModal: (id: string) => void
+  closeGardensReportOverlayModal: () => void
   createBox: (rect: { x: number; y: number; w: number; h: number; contentType?: OverlayContentType; id?: string; name?: string }) => string
 }
 
@@ -80,7 +84,7 @@ export const useCanvasStore = create<CanvasState>()(
     overlay: [],
     setOverlay: (items) => set((s) => { s.overlay = items }),
     layers: [{ id: 'background', name: 'Background', z: 0 }],
-    ui: { showBackgroundModal: false, showLayersModal: false, showBoxModal: false, currentTool: 'none' },
+    ui: { showBackgroundModal: false, showLayersModal: false, showBoxModal: false, showGardensReportModal: false, showGardensReportOverlayModal: false, currentTool: 'none' },
     selectedId: null,
     addItem: (item) => set((s) => { s.items.push(item) }),
     updateItem: (id, partial) => set((s) => {
@@ -125,6 +129,10 @@ export const useCanvasStore = create<CanvasState>()(
     setSelectedId: (id) => set((s) => { s.selectedId = id }),
     openBoxModal: (id) => set((s) => { s.selectedId = id; s.ui.showBoxModal = true }),
     closeBoxModal: () => set((s) => { s.ui.showBoxModal = false }),
+    openGardensReportModal: (id) => set((s) => { s.selectedId = id; s.ui.showGardensReportModal = true }),
+    closeGardensReportModal: () => set((s) => { s.ui.showGardensReportModal = false }),
+    openGardensReportOverlayModal: (id) => set((s) => { s.selectedId = id; s.ui.showGardensReportOverlayModal = true }),
+    closeGardensReportOverlayModal: () => set((s) => { s.ui.showGardensReportOverlayModal = false }),
     createBox: (rect) => {
       let newId = rect.id
       if (!newId) {

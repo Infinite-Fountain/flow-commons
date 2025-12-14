@@ -1,0 +1,23 @@
+{
+  "name": "if-functions",
+  "main": "lib/index.js",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "serve": "npm run build && firebase emulators:start --only functions,firestore",
+    "deploy": "npm run build && firebase deploy --only functions,firestore:rules",
+    "lint": "echo 'add lint if you want'"
+  },
+  "engines": { "node": "20" },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^5.0.1",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.31",
+    "@types/node": "^20",
+    "typescript": "^5.5.0"
+  }
+}
